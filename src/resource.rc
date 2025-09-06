@@ -1,0 +1,36 @@
+// src/resource.rc
+#include <windows.h>
+101 ICON "hoka.ico"
+
+// Version information
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Hoka Development"
+            VALUE "FileDescription", "Hot Key Analyzer - Track your keyboard shortcuts"
+            VALUE "FileVersion", "0.1.0.0"
+            VALUE "InternalName", "hoka"
+            VALUE "LegalCopyright", "Copyright © 2024"
+            VALUE "OriginalFilename", "hoka.exe"
+            VALUE "ProductName", "Hoka Key Analyzer"
+            VALUE "ProductVersion", "0.1.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+// Application manifest for admin rights
+1 RT_MANIFEST "hoka.manifest"
