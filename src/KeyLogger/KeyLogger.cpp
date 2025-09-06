@@ -101,19 +101,23 @@ void KeyLogger::stop() {
 }
 
 bool KeyLogger::hasEvents() {
-  std::lock_guard<std::mutex> lock(queueMutex);
-  return !eventQueue.empty();
+    std::lock_guard<std::mutex> lock(queueMutex);
+    bool hasEvents = !eventQueue.empty();
+    std::cout << "KeyLogger::hasEvents: Queue size = " << eventQueue.size() << std::endl;
+    return hasEvents;
 }
 
 KeyPressEvent KeyLogger::popEvent() {
-  std::lock_guard<std::mutex> lock(queueMutex);
-  if (eventQueue.empty()) {
-    return KeyPressEvent{"", ""};
-  }
-
-  KeyPressEvent event = eventQueue.front();
-  eventQueue.pop();
-  return event;
+    std::lock_guard<std::mutex> lock(queueMutex);
+    if (eventQueue.empty()) {
+        std::cout << "KeyLogger::popEvent: Queue is empty" << std::endl;
+        return KeyPressEvent{"", ""};
+    }
+    KeyPressEvent event = eventQueue.front();
+    eventQueue.pop();
+    std::cout << "KeyLogger::popEvent: Popped event - app = " << event.appName 
+              << ", key = " << event.keyCombination << std::endl;
+    return event;
 }
 
 bool KeyLogger::isActive() const { return isRunning; }

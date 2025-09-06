@@ -1,150 +1,160 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
-#include <FL/x.H> // For fl_xid
+#include <FL/x.H>
 #include <chrono>
-#include <fstream> // For ofstream
+#include <fstream>
 #include <iostream>
 #include <thread>
 #include <windows.h>
-
 #include "Database/Database.h"
 #include "KeyLogger/KeyLogger.h"
 #include "UI/MainWindow.h"
 #include "UI/SystemTray.h"
 
-int main() {
-  // Инициализация базы данных
-  Database db;
-  if (!db.initialize()) {
-    std::cerr << "Failed to initialize database" << std::endl;
-    return 1;
-  }
+void timerCallback(void *data) {
+    auto *ctx = static_cast<std::tuple<KeyLogger*, Database*, MainWindow*, SystemTray*>*>(data);
+    KeyLogger* logger = std::get<0>(*ctx);
+    Database* db = std::get<1>(*ctx);
+    MainWindow* window = std::get<2>(*ctx);
+    SystemTray* tray = std::get<3>(*ctx);
 
-  // Инициализация кейлоггера
-  KeyLogger logger;
-  if (!logger.start()) {
-    std::cerr << "Failed to start key logger" << std::endl;
-    return 1;
-  }
-
-  // Инициализация системного трея
-  SystemTray tray;
-  if (!tray.initialize(L"Hoka Key Analyzer")) {
-    std::cerr << "Failed to initialize system tray" << std::endl;
-    return 1;
-  }
-  tray.show();
-
-  // Инициализация главного окна
-  MainWindow window(800, 600, "Hoka Key Analyzer");
-  window.size_range(400, 300, 0,
-                    0); // Делаем окно resizable (минимальный размер 400x300)
-
-  // Добавляем кнопку для полноэкранного режима (в нижней части окна)
-  Fl_Button *btnFullScreen =
-      new Fl_Button(280, window.h() - 60, 100, 30, "Full Screen");
-  btnFullScreen->callback(
-      [](Fl_Widget *, void *data) {
-        MainWindow *w = static_cast<MainWindow *>(data);
-        if (w->fullscreen_active()) {
-          w->fullscreen_off(w->x(), w->y(), w->w(), w->h());
-        } else {
-          w->fullscreen();
-        }
-      },
-      &window);
-
-  // Связываем SystemTray с MainWindow
-  window.setSystemTray(&tray);
-
-  // Устанавливаем callbacks для трея
-  tray.onRestoreCallback = [&window]() { window.restoreFromTray(); };
-  tray.onDoubleClickCallback = [&window]() { window.restoreFromTray(); };
-  tray.onExitCallback = ([&logger, &db, &tray, &window]() {
-    logger.stop();
-    tray.hide();
-    window.hide();
-    Fl::awake([](void *) { exit(0); }, nullptr);
-  });
-
-  window.setOnRefreshCallback([&db, &window]() {
-    auto apps = db.getAllApps();
-    window.updateAppList(apps);
-    std::string topKeys = db.getTopKeyPresses(10);
-    // Можно обновить recent activity или другие части UI
-  });
-  window.setOnAppSelectedCallback([&db, &window](const std::string &app) {
-    std::string stats = db.getAppStatistics(app);
-    window.updateAppStatistics(app, stats);
-  });
-  window.setOnClearCallback([&db, &window]() {
-    if (db.clearStatistics()) {
-      window.clearRecentActivity();
-      window.updateAppStatistics("", "");
-      window.setStatus("Statistics cleared");
-    }
-  });
-  window.setOnExportCallback([&db, &window]() {
-    std::ofstream exportFile("hoka_stats.txt");
-    if (exportFile) {
-      exportFile << db.getTopKeyPresses(100); // Экспорт топа
-      auto apps = db.getAllApps();
-      for (const auto &app : apps) {
-        exportFile << "\nStatistics for " << app << ":\n";
-        exportFile << db.getAppStatistics(app);
-      }
-      exportFile.close();
-      window.showNotification("Exported to hoka_stats.txt");
-    } else {
-      window.showError("Failed to export");
-    }
-  });
-
-  // Показываем окно
-  window.show();
-
-Fl::wait(0.1);
-  // Используем LoadIcon для GROUP_ICON
-HICON hIconBig = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101));
-HICON hIconSmall = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101));
-
-if (hIconBig && hIconSmall) {
-    HWND hwnd = fl_xid(&window);
-    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
-    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
-} else {
-    MessageBoxW(NULL, L"Failed to Load Icon", L"Error", MB_ICONERROR);
-}
-
-// Установите обработку закрытия в трей
-window.setCloseToTray(true);
-
-// Основной цикл
-while (true) {
-    // Обрабатываем события FLTK
-    if (Fl::wait(0.01) == 0) {
-        // Таймаут, обрабатываем кейлоггер
-        if (logger.hasEvents()) {
-            KeyPressEvent event = logger.popEvent();
-            if (!event.appName.empty() && !event.keyCombination.empty()) {
-                db.updateKeyStatistics(event.appName, event.keyCombination);
-                window.addRecentKeyPress(event.appName, event.keyCombination);
-                std::wstring w_appName(event.appName.begin(), event.appName.end());
-                std::wstring w_keyCombo(event.keyCombination.begin(), event.keyCombination.end());
-                tray.setTooltip(L"Hoka - Last: " + w_appName + L" → " + w_keyCombo);
+    if (logger->hasEvents()) {
+        KeyPressEvent event = logger->popEvent();
+        if (!event.appName.empty() && !event.keyCombination.empty()) {
+            db->updateKeyStatistics(event.appName, event.keyCombination);
+            window->addRecentKeyPress(event.appName, event.keyCombination);
+            std::wstring w_appName(event.appName.begin(), event.appName.end());
+            std::wstring w_keyCombo(event.keyCombination.begin(), event.keyCombination.end());
+            tray->setTooltip(L"Hoka - Last: " + w_appName + L" → " + w_keyCombo);
+            window->updateAppList(db->getAllApps());
+            std::string selectedApp = window->getSelectedApp();
+            if (!selectedApp.empty()) {
+                std::string stats = db->getAppStatistics(selectedApp);
+                window->updateAppStatistics(selectedApp, stats);
             }
         }
     }
-    
-    // Проверяем, нужно ли выйти
-    if (!window.visible() && !tray.isVisible) {
-        break;
+
+    if (window->visible() || tray->isVisible) {
+        Fl::repeat_timeout(0.01, timerCallback, data); // Проверять каждые 10 мс
+    } else {
+        logger->stop();
+        tray->hide();
+        Fl::awake([](void*) { exit(0); }, nullptr);
     }
 }
 
-  // Cleanup
-  logger.stop();
-  tray.hide();
+int main() {
+    std::cout << "Starting Hoka..." << std::endl;
 
-  return Fl::run(); // Use Fl::run() for the event loop
+    Database db;
+    if (!db.initialize()) {
+        std::cerr << "Failed to initialize database" << std::endl;
+        return 1;
+    }
+    std::cout << "Database initialized" << std::endl;
+
+    KeyLogger logger;
+    if (!logger.start()) {
+        std::cerr << "Failed to start key logger" << std::endl;
+        return 1;
+    }
+    std::cout << "KeyLogger started" << std::endl;
+
+    SystemTray tray;
+    if (!tray.initialize(L"Hoka Key Analyzer")) {
+        std::cerr << "Failed to initialize system tray" << std::endl;
+        return 1;
+    }
+    tray.show();
+    std::cout << "SystemTray initialized and shown" << std::endl;
+
+    MainWindow window(800, 600, "Hoka Key Analyzer");
+    window.size_range(400, 300, 0, 0);
+    std::cout << "MainWindow created" << std::endl;
+
+    // Настройка кнопки Full Screen
+    Fl_Button *btnFullScreen = new Fl_Button(280, window.h() - 60, 100, 30, "Full Screen");
+    btnFullScreen->callback(
+        [](Fl_Widget *, void *data) {
+            MainWindow *w = static_cast<MainWindow *>(data);
+            if (w->fullscreen_active()) {
+                w->fullscreen_off(w->x(), w->y(), w->w(), w->h());
+            } else {
+                w->fullscreen();
+            }
+        },
+        &window);
+
+    window.setSystemTray(&tray);
+    window.setCloseToTray(true);
+
+    tray.onRestoreCallback = [&window]() { window.restoreFromTray(); };
+    tray.onDoubleClickCallback = [&window]() { window.restoreFromTray(); };
+    tray.onExitCallback = ([&logger, &db, &tray, &window]() {
+        logger.stop();
+        tray.hide();
+        window.hide();
+        Fl::awake([](void *) { exit(0); }, nullptr);
+    });
+
+    window.setOnRefreshCallback([&db, &window]() {
+        auto apps = db.getAllApps();
+        std::cout << "RefreshCallback: getAllApps returned " << apps.size() << " apps" << std::endl;
+        for (const auto &app : apps) {
+            std::cout << "App: " << app << std::endl;
+        }
+        window.updateAppList(apps);
+        std::string topKeys = db.getTopKeyPresses(10);
+        std::cout << "RefreshCallback: topKeys = " << topKeys << std::endl;
+    });
+    window.setOnAppSelectedCallback([&db, &window](const std::string &app) {
+        std::cout << "AppSelectedCallback: selected app = " << app << std::endl;
+        std::string stats = db.getAppStatistics(app);
+        std::cout << "AppSelectedCallback: stats = " << stats << std::endl;
+        window.updateAppStatistics(app, stats);
+    });
+    window.setOnClearCallback([&db, &window]() {
+        if (db.clearStatistics()) {
+            std::cout << "ClearCallback: statistics cleared" << std::endl;
+            window.clearRecentActivity();
+            window.updateAppStatistics("", "");
+            window.setStatus("Statistics cleared");
+        }
+    });
+    window.setOnExportCallback([&db, &window]() {
+        std::ofstream exportFile("hoka_stats.txt");
+        if (exportFile) {
+            exportFile << db.getTopKeyPresses(100);
+            auto apps = db.getAllApps();
+            for (const auto &app : apps) {
+                exportFile << "\nStatistics for " << app << ":\n";
+                exportFile << db.getAppStatistics(app);
+            }
+            exportFile.close();
+            window.showNotification("Exported to hoka_stats.txt");
+            std::cout << "ExportCallback: exported to hoka_stats.txt" << std::endl;
+        } else {
+            window.showError("Failed to export");
+            std::cout << "ExportCallback: failed to export" << std::endl;
+        }
+    });
+
+    window.show();
+    std::cout << "MainWindow shown" << std::endl;
+
+    auto ctx = std::make_tuple(&logger, &db, &window, &tray);
+    Fl::add_timeout(0.01, timerCallback, &ctx);
+
+    HICON hIconBig = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101));
+    HICON hIconSmall = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101));
+    if (hIconBig && hIconSmall) {
+        HWND hwnd = fl_xid(&window);
+        SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+        SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
+    } else {
+        MessageBoxW(NULL, L"Failed to Load Icon", L"Error", MB_ICONERROR);
+    }
+
+    return Fl::run();
 }
