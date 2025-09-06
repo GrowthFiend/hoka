@@ -17,6 +17,8 @@
 
 class SystemTray {
 public:
+  bool isVisible;
+
   SystemTray();
   ~SystemTray();
 
@@ -37,7 +39,6 @@ private:
   HICON hIcon;
   NOTIFYICONDATAW nid;
   UINT WM_TRAYICON;
-  bool isVisible;
 
   static SystemTray *instance;
 

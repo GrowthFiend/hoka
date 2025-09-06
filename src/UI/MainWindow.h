@@ -49,7 +49,6 @@ private:
   std::function<void(const std::string &)> onAppSelectedCallback;
 
   // Static callback methods
-  static void windowCallback(Fl_Widget *widget, void *data);
   static void clearCallback(Fl_Widget *widget, void *data);
   static void exportCallback(Fl_Widget *widget, void *data);
   static void refreshCallback(Fl_Widget *widget, void *data);
@@ -63,7 +62,7 @@ private:
 
 public:
   MainWindow(int width, int height, const char *title);
-
+  bool visible() const { return Fl_Window::visible(); }
   void show() override;
   void hide() override;
   void resize(int x, int y, int w, int h) override;
@@ -102,4 +101,5 @@ public:
   int handle(int event) override;
   void setCloseToTray(bool enable) { shouldCloseToTray = enable; }
   bool getCloseToTray() const { return shouldCloseToTray; }
+  void closeToTray(bool enable) { shouldCloseToTray = enable; }
 };

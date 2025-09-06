@@ -79,7 +79,7 @@ MainWindow::MainWindow(int width, int height, const char *title)
   statusBox->labelsize(10);
 
   end();
-  callback(windowCallback, this);
+  
   resizable(this); // Make window resizable
   updateLayout();  // Initial layout
 }
@@ -98,7 +98,7 @@ void MainWindow::hide() {
 }
 
 void MainWindow::minimizeToTray() {
-  hide();
+  Fl_Window::hide();  // Call BASE hide() to avoid recursion
   isMinimizedToTray = true;
   if (systemTray) {
     systemTray->showBalloon(
@@ -276,14 +276,6 @@ void MainWindow::refreshUI() {
   }
 }
 
-// Static callback methods
-void MainWindow::windowCallback(Fl_Widget *widget, void *data) {
-  MainWindow *window = static_cast<MainWindow *>(data);
-  if (window->onCloseCallback) {
-    window->onCloseCallback();
-  }
-}
-
 void MainWindow::clearCallback(Fl_Widget *widget, void *data) {
   MainWindow *window = static_cast<MainWindow *>(data);
   if (window->onClearCallback) {
@@ -338,17 +330,17 @@ void MainWindow::setOnAppSelectedCallback(
 }
 
 int MainWindow::handle(int event) {
-  if (event == FL_SHORTCUT && Fl::event_key() == FL_Escape) {
-    return 1; // Игнорируем ESC
-  }
-
-  // Перехватываем событие закрытия окна
-  if (event == FL_CLOSE) {
-    if (onCloseCallback) {
-      onCloseCallback(); // Вызываем callback для сворачивания в трей
+    if (event == FL_SHORTCUT && Fl::event_key() == FL_Escape) {
+        return 1; // Игнорируем ESC
     }
-    return 1; // Предотвращаем стандартную обработку закрытия
-  }
 
-  return Fl_Window::handle(event);
+    // Перехватываем событие закрытия окна
+    if (event == FL_CLOSE) {
+        if (shouldCloseToTray) {
+            minimizeToTray(); // Сворачиваем в трей вместо закрытия
+            return 1; // Предотвращаем стандартную обработку закрытия
+        }
+    }
+
+    return Fl_Window::handle(event);
 }

@@ -67,10 +67,6 @@ int main() {
     Fl::awake([](void *) { exit(0); }, nullptr);
   });
 
-  // Устанавливаем callbacks для окна
-  window.setOnCloseCallback([&window]() {
-    window.hide(); // Вызываем hide(), который теперь сворачивает в трей
-  });
   window.setOnRefreshCallback([&db, &window]() {
     auto apps = db.getAllApps();
     window.updateAppList(apps);
@@ -120,36 +116,31 @@ if (hIconBig && hIconSmall) {
     MessageBoxW(NULL, L"Failed to Load Icon", L"Error", MB_ICONERROR);
 }
 
-  Fl::add_handler([](int event) -> int {
-    if (event == FL_CLOSE) {
-      // Проверяем, какое окно пытаются закрыть
-      Fl_Window *win = Fl::first_window();
-      if (win && win->visible()) {
-        MainWindow *mainWin = dynamic_cast<MainWindow *>(win);
-        if (mainWin) {
-          mainWin->minimizeToTray();
-          return 1; // Блокируем стандартную обработку закрытия
+// Установите обработку закрытия в трей
+window.setCloseToTray(true);
+
+// Основной цикл
+while (true) {
+    // Обрабатываем события FLTK
+    if (Fl::wait(0.01) == 0) {
+        // Таймаут, обрабатываем кейлоггер
+        if (logger.hasEvents()) {
+            KeyPressEvent event = logger.popEvent();
+            if (!event.appName.empty() && !event.keyCombination.empty()) {
+                db.updateKeyStatistics(event.appName, event.keyCombination);
+                window.addRecentKeyPress(event.appName, event.keyCombination);
+                std::wstring w_appName(event.appName.begin(), event.appName.end());
+                std::wstring w_keyCombo(event.keyCombination.begin(), event.keyCombination.end());
+                tray.setTooltip(L"Hoka - Last: " + w_appName + L" → " + w_keyCombo);
+            }
         }
-      }
     }
-    return 0;
-  });
-  // Основной цикл: обработка событий кейлоггера
-  while (Fl::wait()) {
-    if (logger.hasEvents()) {
-      KeyPressEvent event = logger.popEvent();
-      if (!event.appName.empty() && !event.keyCombination.empty()) {
-        db.updateKeyStatistics(event.appName, event.keyCombination);
-        window.addRecentKeyPress(event.appName, event.keyCombination);
-        // Обновляем статус в трее
-        std::wstring w_appName(event.appName.begin(), event.appName.end());
-        std::wstring w_keyCombo(event.keyCombination.begin(), event.keyCombination.end());
-        tray.setTooltip(L"Hoka - Last: " + w_appName + L" → " + w_keyCombo);
-      }
+    
+    // Проверяем, нужно ли выйти
+    if (!window.visible() && !tray.isVisible) {
+        break;
     }
-    // Небольшая задержка, чтобы не нагружать CPU
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
+}
 
   // Cleanup
   logger.stop();

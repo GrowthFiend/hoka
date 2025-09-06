@@ -152,24 +152,23 @@ void SystemTray::showBalloon(const std::wstring &title,
   nid.uFlags &= ~NIF_INFO;
 }
 
-LRESULT CALLBACK SystemTray::TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam,
-                                         LPARAM lParam) {
+LRESULT CALLBACK SystemTray::TrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   if (!instance)
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 
   if (msg == instance->WM_TRAYICON) {
-    // ДЕБАГ: выводим полученное сообщение
-    std::wcout << L"Tray message received: 0x" << std::hex << lParam << std::endl;
-    
-    // Для NOTIFYICON_VERSION_4 сообщения могут быть другими
-    // Попробуем обрабатывать все ненулевые сообщения
-    if (lParam != WM_MOUSEMOVE && lParam != 0) {
-      std::wcout << L"Non-mouse-move event, showing menu" << std::endl;
+    if (lParam == WM_LBUTTONDBLCLK) {
+      // Двойной клик - восстанавливаем
+      if (instance->onDoubleClickCallback) {
+        instance->onDoubleClickCallback();
+      }
+    }
+    else if (lParam == WM_RBUTTONUP) {
+      // Правый клик - показываем меню
       instance->showContextMenu();
     }
-    
     return 0;
-  } 
+  }
   else if (msg == WM_COMMAND) {
     // Обрабатываем команды из меню
     std::wcout << L"WM_COMMAND received: 0x" << std::hex << LOWORD(wParam) << std::endl;
