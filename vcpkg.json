@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "dependencies": [
       "fltk",
-      "sqlite3"
+      "sqlite3",
+      "gtest"
     ]
   }
