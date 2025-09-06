@@ -56,7 +56,8 @@ bool SystemTray::initialize(const std::wstring &tooltip) {
   // Загружаем или создаем иконку
   hIcon = loadIconFromResource();
   if (!hIcon) {
-    hIcon = createDefaultIcon();
+    std::cerr << "Failed to load icon from resource"
+                << std::endl;
   }
 
   // Настраиваем структуру для системного трея
@@ -196,7 +197,7 @@ HICON SystemTray::loadIconFromResource() {
   // Пытаемся загрузить иконку из ресурсов
   HICON icon = (HICON)LoadImageW(GetModuleHandleW(nullptr),
                                  MAKEINTRESOURCEW(101), // ID иконки в ресурсах
-                                 IMAGE_ICON, 16, 16,    // Размер для трея
+                                 IMAGE_ICON, 32, 32,    // Размер для трея
                                  LR_DEFAULTCOLOR);
 
   if (!icon) {
@@ -205,55 +206,4 @@ HICON SystemTray::loadIconFromResource() {
   }
 
   return icon;
-}
-
-HICON SystemTray::createDefaultIcon() {
-  // Создаем bitmap для иконки 16x16
-  HDC hdc = GetDC(nullptr);
-  HDC hdcMem = CreateCompatibleDC(hdc);
-  HBITMAP hbm = CreateCompatibleBitmap(hdc, 16, 16);
-  HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hbm);
-
-  // Рисуем простую иконку - синий квадрат с белой буквой H
-  HBRUSH hBrush = CreateSolidBrush(RGB(0, 100, 200));
-  RECT rect = {0, 0, 16, 16};
-  FillRect(hdcMem, &rect, hBrush);
-
-  SetTextColor(hdcMem, RGB(255, 255, 255));
-  SetBkMode(hdcMem, TRANSPARENT);
-
-  HFONT hFont =
-      CreateFontW(12, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                  OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                  DEFAULT_PITCH | FF_SWISS, L"Arial");
-
-  HFONT hOldFont = (HFONT)SelectObject(hdcMem, hFont);
-  TextOutW(hdcMem, 3, 1, L"H", 1);
-
-  // Восстанавливаем контекст
-  SelectObject(hdcMem, hOldFont);
-  SelectObject(hdcMem, hbmOld);
-
-  // Очищаем ресурсы
-  DeleteObject(hFont);
-  DeleteObject(hBrush);
-  DeleteDC(hdcMem);
-  ReleaseDC(nullptr, hdc);
-
-  // Создаем маску (полностью непрозрачную)
-  HBITMAP hbmMask = CreateBitmap(16, 16, 1, 1, nullptr);
-
-  // Создаем иконку
-  ICONINFO ii = {};
-  ii.fIcon = TRUE;
-  ii.hbmColor = hbm;
-  ii.hbmMask = hbmMask;
-
-  HICON hIcon = CreateIconIndirect(&ii);
-
-  // Очищаем
-  DeleteObject(hbm);
-  DeleteObject(hbmMask);
-
-  return hIcon;
 }

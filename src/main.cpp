@@ -54,21 +54,6 @@ int main() {
       },
       &window);
 
-  // Устанавливаем иконку для окна (из ресурсов)
-  HICON hIcon = (HICON)LoadImageW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101),
-                                 IMAGE_ICON, 32, 32, // Размер для окна
-                                 LR_DEFAULTCOLOR);
-
-  HICON hIconSmall = (HICON)LoadImageW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101), IMAGE_ICON,
-                       16, 16, // Размер для маленькой иконки
-                       LR_DEFAULTCOLOR);
-
-  if (hIcon) {
-    HWND hwnd = fl_xid(&window);
-    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
-    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
-  }
-
   // Связываем SystemTray с MainWindow
   window.setSystemTray(&tray);
 
@@ -120,7 +105,21 @@ int main() {
   });
 
   // Показываем окно
-  window.show(); // Call show() without arguments
+  window.show();
+
+Fl::wait(0.1);
+  // Используем LoadIcon для GROUP_ICON
+HICON hIconBig = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101));
+HICON hIconSmall = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(101));
+
+if (hIconBig && hIconSmall) {
+    HWND hwnd = fl_xid(&window);
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
+} else {
+    MessageBoxW(NULL, L"Failed to Load Icon", L"Error", MB_ICONERROR);
+}
+
   Fl::add_handler([](int event) -> int {
     if (event == FL_CLOSE) {
       // Проверяем, какое окно пытаются закрыть

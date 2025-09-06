@@ -46,7 +46,6 @@ private:
                                       LPARAM lParam);
   void showContextMenu();
   HICON loadIconFromResource();
-  HICON createDefaultIcon();
 
   // Context menu commands
   static const UINT ID_RESTORE = 1001;
