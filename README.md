@@ -39,14 +39,14 @@ As the project is in early development, the build process is primarily intended 
 
 *   **OS:** Windows 10 or 11
 *   **Git**
-*   **A C++17 Compiler:** (e.g., MSVC from Visual Studio 2022 Build Tools)
+*   **A C++17 Compiler:** (e.g., MinGW)
 *   **CMake:** Version 3.15+
 
 ### Steps
 
 1.  **Clone the repository and its submodules:**
     ```bash
-    git clone --recursive https://github.com/GrowthFiend/Hoka.git
+    git clone --recursive https://github.com/GrowthFiend/hoka.git
     cd Hoka
     ```
 
