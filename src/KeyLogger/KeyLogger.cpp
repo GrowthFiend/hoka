@@ -20,7 +20,7 @@ KeyLogger::~KeyLogger() {
 // Статический метод-обработчик хука
 LRESULT CALLBACK KeyLogger::keyboardProc(int nCode, WPARAM wParam,
                                          LPARAM lParam) {
-  if (nCode >= 0 && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
+  if (nCode >= 0 && (wParam == WM_KEYUP || wParam == WM_SYSKEYUP)) { //TODO: Возможно стоит добавить настройку, которая позволила бы выбрать между DOWN и UP
     KBDLLHOOKSTRUCT *kbdStruct = (KBDLLHOOKSTRUCT *)lParam;
 
     // Получаем ID активного процесса
@@ -59,7 +59,7 @@ LRESULT CALLBACK KeyLogger::keyboardProc(int nCode, WPARAM wParam,
       KeyPressEvent event{appName, keyCombination};
 
       // Используем защищенный доступ к очереди
-      {
+      if(mainKey!="Ctrl" && mainKey!="Shift" && mainKey!="Alt" && mainKey!="Win") { //TODO: возможно стоит сделать настройкой, а пока исключаем одиночные нажатия модификаторов
         std::lock_guard<std::mutex> lock(queueMutex);
         eventQueue.push(event);
       }
