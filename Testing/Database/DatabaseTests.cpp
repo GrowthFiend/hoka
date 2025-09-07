@@ -31,9 +31,18 @@ TEST_F(DatabaseTest, UpdateAndGetKeyStatistics) {
 // Test case for clearing statistics
 TEST_F(DatabaseTest, ClearStatistics) {
     db.updateKeyStatistics("testApp", "Ctrl+C");
+    
+    // Проверьте, что данные действительно добавились
+    std::string before = db.getAppStatistics("testApp");
+    std::cout << "Before clear: " << before << std::endl;
+    
     EXPECT_TRUE(db.clearStatistics()) << "Failed to clear statistics";
+    
+    // Проверьте количество записей после очистки
     std::string stats = db.getAppStatistics("testApp");
-    EXPECT_TRUE(stats.empty() || stats == "No statistics available") << "Stats not cleared";
+    std::cout << "After clear: " << stats << std::endl;
+    
+    EXPECT_TRUE(stats.empty() || stats == "No key presses recorded for testApp yet.\n") << "Stats not cleared";
 }
 
 // Test case for retrieving all apps
