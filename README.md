@@ -65,11 +65,11 @@ As the project is in early development, the build process is primarily intended 
 
 ## 🔮 Roadmap
 
-- [*] Project setup and dependency management (CMake, vcpkg).
-- [*] Research and implement low-level Windows keylogging hooks.
-- [*] Design and create the local SQLite database schema.
-- [*] Develop the core application logic for logging and storing hotkeys.
-- [*] Build the primary user interface with FLTK.
+- [x] Project setup and dependency management (CMake, vcpkg).
+- [x] Research and implement low-level Windows keylogging hooks.
+- [x] Design and create the local SQLite database schema.
+- [x] Develop the core application logic for logging and storing hotkeys.
+- [x] Build the primary user interface with FLTK.
 - [ ] Implement data analysis and visualization features.
 - [ ] Alpha testing and refinement.
 
