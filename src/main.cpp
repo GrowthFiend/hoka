@@ -194,19 +194,22 @@ private:
     std::atomic<bool> shouldExit{false};
     void shutdown() {
         std::cout << "Shutting down application..." << std::endl;
-        shouldExit = true; // Устанавливаем флаг выхода
-        
+        shouldExit = true;
+    
         if (logger) {
             logger->stop();
         }
-        
+    
         if (tray) {
             tray->hide();
         }
-        
+    
         if (window) {
             window->hide();
         }
+    
+        // Принудительно завершаем FLTK
+        exit(0);
     }
 
 public:
