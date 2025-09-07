@@ -51,7 +51,7 @@ As the project is in early development, the build process is primarily intended 
     ```
 
 2.  **Configure the project with CMake:**
-    This command will automatically handle all dependencies (like FLTK and SQLite) via vcpkg.
+    This command will automatically handle all dependencies (like FLTK, Gtest and SQLite) via vcpkg.
     ```bash
     cmake -B build -S .
     ```
@@ -65,11 +65,11 @@ As the project is in early development, the build process is primarily intended 
 
 ## 🔮 Roadmap
 
-- [ ] Project setup and dependency management (CMake, vcpkg).
-- [ ] Research and implement low-level Windows keylogging hooks.
-- [ ] Design and create the local SQLite database schema.
-- [ ] Develop the core application logic for logging and storing hotkeys.
-- [ ] Build the primary user interface with FLTK.
+- [*] Project setup and dependency management (CMake, vcpkg).
+- [*] Research and implement low-level Windows keylogging hooks.
+- [*] Design and create the local SQLite database schema.
+- [*] Develop the core application logic for logging and storing hotkeys.
+- [*] Build the primary user interface with FLTK.
 - [ ] Implement data analysis and visualization features.
 - [ ] Alpha testing and refinement.
 
@@ -92,3 +92,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 *   FLTK team for the lightweight GUI toolkit.
 *   SQLite developers for a robust embedded database solution.
+*   GTest developers for a great framework.
