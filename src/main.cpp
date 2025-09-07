@@ -98,16 +98,7 @@ int main() {
         Fl::awake([](void *) { exit(0); }, nullptr);
     });
 
-    window.setOnRefreshCallback([&db, &window]() {
-        auto apps = db.getAllApps();
-        std::cout << "RefreshCallback: getAllApps returned " << apps.size() << " apps" << std::endl;
-        for (const auto &app : apps) {
-            std::cout << "App: " << app << std::endl;
-        }
-        window.updateAppList(apps);
-        std::string topKeys = db.getTopKeyPresses(10);
-        std::cout << "RefreshCallback: topKeys = " << topKeys << std::endl;
-    });
+
     window.setOnAppSelectedCallback([&db, &window](const std::string &app) {
         std::cout << "AppSelectedCallback: selected app = " << app << std::endl;
         std::string stats = db.getAppStatistics(app);
@@ -142,7 +133,7 @@ int main() {
 
     window.show();
     std::cout << "MainWindow shown" << std::endl;
-
+    
     auto ctx = std::make_tuple(&logger, &db, &window, &tray);
     Fl::add_timeout(0.01, timerCallback, &ctx);
 

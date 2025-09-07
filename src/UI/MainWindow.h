@@ -31,7 +31,6 @@ private:
 
   // Bottom controls
   Fl_Button *btnClear;
-  Fl_Button *btnRefresh;
   Fl_Button *btnExport;
 
   // Status bar
@@ -45,13 +44,11 @@ private:
   std::function<void()> onCloseCallback;
   std::function<void()> onClearCallback;
   std::function<void()> onExportCallback;
-  std::function<void()> onRefreshCallback;
   std::function<void(const std::string &)> onAppSelectedCallback;
 
   // Static callback methods
   static void clearCallback(Fl_Widget *widget, void *data);
   static void exportCallback(Fl_Widget *widget, void *data);
-  static void refreshCallback(Fl_Widget *widget, void *data);
   static void appChoiceCallback(Fl_Widget *widget, void *data);
 
   SystemTray *systemTray = nullptr;
@@ -90,7 +87,6 @@ public:
   void setOnCloseCallback(std::function<void()> callback);
   void setOnClearCallback(std::function<void()> callback);
   void setOnExportCallback(std::function<void()> callback);
-  void setOnRefreshCallback(std::function<void()> callback);
   void
   setOnAppSelectedCallback(std::function<void(const std::string &)> callback);
 

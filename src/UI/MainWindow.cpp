@@ -65,10 +65,7 @@ MainWindow::MainWindow(int width, int height, const char *title)
   btnClear = new Fl_Button(10, height - 60, 80, 30, "Clear");
   btnClear->callback(clearCallback, this);
 
-  btnRefresh = new Fl_Button(100, height - 60, 80, 30, "Refresh");
-  btnRefresh->callback(refreshCallback, this);
-
-  btnExport = new Fl_Button(190, height - 60, 80, 30, "Export");
+  btnExport = new Fl_Button(100, height - 60, 80, 30, "Export");
   btnExport->callback(exportCallback, this);
 
   // Status bar
@@ -131,8 +128,7 @@ void MainWindow::updateLayout() {
   appStats->resize(25 + (w - 30) / 2, 115, (w - 30) / 2 - 10, h - 200);
 
   btnClear->resize(10, h - 60, 80, 30);
-  btnRefresh->resize(100, h - 60, 80, 30);
-  btnExport->resize(190, h - 60, 80, 30);
+  btnExport->resize(100, h - 60, 80, 30);
 
   statusBox->resize(10, h - 25, w - 20, 20);
 
@@ -265,17 +261,6 @@ void MainWindow::showError(const std::string &errorMessage) {
   setStatus("Error: " + errorMessage);
 }
 
-void MainWindow::refreshUI() {
-  if (onRefreshCallback) {
-    onRefreshCallback();
-  }
-
-  std::string selectedApp = getSelectedApp();
-  if (!selectedApp.empty() && onAppSelectedCallback) {
-    onAppSelectedCallback(selectedApp);
-  }
-}
-
 void MainWindow::clearCallback(Fl_Widget *widget, void *data) {
   MainWindow *window = static_cast<MainWindow *>(data);
   if (window->onClearCallback) {
@@ -291,11 +276,6 @@ void MainWindow::exportCallback(Fl_Widget *widget, void *data) {
   if (window->onExportCallback) {
     window->onExportCallback();
   }
-}
-
-void MainWindow::refreshCallback(Fl_Widget *widget, void *data) {
-  MainWindow *window = static_cast<MainWindow *>(data);
-  window->refreshUI();
 }
 
 void MainWindow::appChoiceCallback(Fl_Widget *widget, void *data) {
@@ -318,10 +298,6 @@ void MainWindow::setOnClearCallback(std::function<void()> callback) {
 
 void MainWindow::setOnExportCallback(std::function<void()> callback) {
   onExportCallback = callback;
-}
-
-void MainWindow::setOnRefreshCallback(std::function<void()> callback) {
-  onRefreshCallback = callback;
 }
 
 void MainWindow::setOnAppSelectedCallback(
