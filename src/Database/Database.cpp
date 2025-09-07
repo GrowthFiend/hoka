@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-
+#include <variant>
 
 Database::Database() : db(nullptr) {}
 
@@ -12,207 +12,169 @@ Database::~Database() {
   }
 }
 
+bool Database::executePreparedQuery(const char* sql, 
+                                   const std::vector<std::variant<std::string, int>>& params, 
+                                   std::function<bool(sqlite3_stmt*)> processor) {
+    if (!db) {
+        std::cerr << "Database not initialized!" << std::endl;
+        return false;
+    }
+
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << std::endl;
+        return false;
+    }
+
+    // Биндим параметры с учетом типа
+    for (size_t i = 0; i < params.size(); ++i) {
+        std::visit([stmt, i](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                sqlite3_bind_text(stmt, i + 1, value.c_str(), -1, SQLITE_STATIC);
+            } else if constexpr (std::is_same_v<T, int>) {
+                sqlite3_bind_int(stmt, i + 1, value);
+            }
+        }, params[i]);
+    }
+
+    bool success = true;
+    if (processor) {
+        success = processor(stmt);
+    } else {
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            std::cerr << "Failed to execute statement: " << sqlite3_errmsg(db) << std::endl;
+            success = false;
+        }
+    }
+
+    sqlite3_finalize(stmt);
+    return success;
+}
+
+bool Database::openDatabase(const std::string& dbPath) {
+    int rc = sqlite3_open(dbPath.c_str(), &db);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Cannot open database: " << sqlite3_errmsg(db) << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool Database::createTables() {
+    return executePreparedQuery("CREATE TABLE IF NOT EXISTS key_statistics ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "app_name TEXT NOT NULL,"
+        "key_combination TEXT NOT NULL,"
+        "press_count INTEGER DEFAULT 1,"
+        "last_pressed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "UNIQUE(app_name, key_combination)"
+        ");", {});
+}
+
+std::vector<std::pair<std::string, int>> Database::fetchAppKeyData(const std::string& appName, int limit) {
+    std::vector<std::pair<std::string, int>> data;
+
+    auto processor = [&](sqlite3_stmt* stmt) -> bool {
+        int rc;
+        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+            const char *keyCombination =
+                reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+            int pressCount = sqlite3_column_int(stmt, 1);
+            
+            if (keyCombination) {
+                data.emplace_back(std::string(keyCombination), pressCount);
+            }
+        }
+        return rc == SQLITE_DONE;
+    };
+
+    executePreparedQuery("SELECT key_combination, press_count "
+                           "FROM key_statistics "
+                           "WHERE app_name = ? "
+                           "ORDER BY press_count DESC "
+                           "LIMIT ?;", {appName, limit}, processor);
+    return data;
+}
+
+std::string Database::formatStatisticsOutput(const std::vector<std::pair<std::string, int>>& data, 
+                                           const std::string& appName) {
+    std::stringstream ss;
+    
+    if (data.empty()) {
+        ss << "No key presses recorded for " << appName << " yet.\n";
+        return ss.str();
+    }
+
+    int rank = 1;
+    int totalPresses = 0;
+    
+    for (const auto& [keyCombination, pressCount] : data) {
+        totalPresses += pressCount;
+        ss << std::setw(2) << rank << ". " << std::setw(25) << std::left
+           << keyCombination << std::setw(6) << std::right << pressCount
+           << " times\n";
+        rank++;
+    }
+
+    ss << "\n" << std::string(40, '-') << "\n";
+    ss << "Total combinations: " << data.size() << "\n";
+    ss << "Total key presses: " << totalPresses << "\n";
+    
+    return ss.str();
+}
+
 bool Database::initialize() {
-  int rc = sqlite3_open("keypress_stats.db", &db);
-  if (rc != SQLITE_OK) {
-    std::cerr << "Cannot open database: " << sqlite3_errmsg(db) << std::endl;
-    return false;
-  }
-
-  // Создаем таблицу для статистики нажатий
-  const char *createTableSQL =
-      "CREATE TABLE IF NOT EXISTS key_statistics ("
-      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-      "app_name TEXT NOT NULL,"
-      "key_combination TEXT NOT NULL,"
-      "press_count INTEGER DEFAULT 1,"
-      "last_pressed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
-      "UNIQUE(app_name, key_combination)"
-      ");";
-
-  char *errMsg = nullptr;
-  rc = sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg);
-  if (rc != SQLITE_OK) {
-    std::cerr << "SQL error: " << errMsg << std::endl;
-    sqlite3_free(errMsg);
-    return false;
-  }
-
-  std::cout << "Database initialized successfully" << std::endl;
-  return true;
+    if (!openDatabase("keypress_stats.db")) {
+        return false;
+    }
+    
+    if (!createTables()) {
+        return false;
+    }
+    
+    std::cout << "Database initialized successfully" << std::endl;
+    return true;
 }
 
 void Database::updateKeyStatistics(const std::string &appName,
                                    const std::string &keyCombination) {
-  if (!db) {
-    std::cerr << "Database not initialized!" << std::endl;
-    return;
-  }
-
-  // Используем INSERT OR REPLACE для обновления счетчика
-  const char *updateSQL =
-      "INSERT OR REPLACE INTO key_statistics (app_name, key_combination, "
-      "press_count, last_pressed) "
-      "VALUES (?, ?, COALESCE((SELECT press_count FROM key_statistics "
-      "WHERE app_name = ? AND key_combination = ?) + 1, 1), "
-      "CURRENT_TIMESTAMP);";
-
-  sqlite3_stmt *stmt;
-  int rc = sqlite3_prepare_v2(db, updateSQL, -1, &stmt, nullptr);
-  if (rc != SQLITE_OK) {
-    std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db)
-              << std::endl;
-    return;
-  }
-
-  // Привязываем параметры
-  sqlite3_bind_text(stmt, 1, appName.c_str(), -1, SQLITE_STATIC);
-  sqlite3_bind_text(stmt, 2, keyCombination.c_str(), -1, SQLITE_STATIC);
-  sqlite3_bind_text(stmt, 3, appName.c_str(), -1, SQLITE_STATIC);
-  sqlite3_bind_text(stmt, 4, keyCombination.c_str(), -1, SQLITE_STATIC);
-
-  rc = sqlite3_step(stmt);
-  if (rc != SQLITE_DONE) {
-    std::cerr << "Failed to execute statement: " << sqlite3_errmsg(db)
-              << std::endl;
-  }
-
-  sqlite3_finalize(stmt);
+    executePreparedQuery("INSERT OR REPLACE INTO key_statistics (app_name, key_combination, "
+        "press_count, last_pressed) "
+        "VALUES (?, ?, COALESCE((SELECT press_count FROM key_statistics "
+        "WHERE app_name = ? AND key_combination = ?) + 1, 1), "
+        "CURRENT_TIMESTAMP);", {appName, keyCombination, appName, keyCombination});
 }
 
 std::string Database::getAppStatistics(const std::string &appName, int limit) {
-  if (!db)
-    return "Database not initialized!";
-
-  std::stringstream ss;
-  const char *querySQL = "SELECT key_combination, press_count "
-                         "FROM key_statistics "
-                         "WHERE app_name = ? "
-                         "ORDER BY press_count DESC "
-                         "LIMIT ?;";
-
-  sqlite3_stmt *stmt;
-  int rc = sqlite3_prepare_v2(db, querySQL, -1, &stmt, nullptr);
-  if (rc != SQLITE_OK) {
-    return "Error querying database";
-  }
-
-  sqlite3_bind_text(stmt, 1, appName.c_str(), -1, SQLITE_STATIC);
-  sqlite3_bind_int(stmt, 2, limit);
-
-  bool hasData = false;
-  int rank = 1;
-  int totalPresses = 0;
-
-  while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-    hasData = true;
-    const char *keyCombination =
-        reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
-    int pressCount = sqlite3_column_int(stmt, 1);
-    totalPresses += pressCount;
-
-    // Форматируем вывод с выравниванием
-    ss << std::setw(2) << rank << ". " << std::setw(25) << std::left
-       << keyCombination << std::setw(6) << std::right << pressCount
-       << " times\n";
-    rank++;
-  }
-
-  if (!hasData) {
-    ss << "No key presses recorded for " << appName << " yet.\n";
-  } else {
-    // Добавляем общую статистику в конец
-    ss << "\n" << std::string(40, '-') << "\n";
-    ss << "Total combinations: " << (rank - 1) << "\n";
-    ss << "Total key presses: " << totalPresses << "\n";
-  }
-
-  sqlite3_finalize(stmt);
-  return ss.str();
+    auto data = fetchAppKeyData(appName, limit);
+    if (data.empty() && !db) {
+        return "Database not initialized!";
+    }
+    return formatStatisticsOutput(data, appName);
 }
 
 std::vector<std::string> Database::getAllApps() {
-  std::vector<std::string> apps;
-  if (!db)
+    std::vector<std::string> apps;
+    auto processor = [&](sqlite3_stmt* stmt) -> bool {
+        int rc;
+        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+            const char *appName =
+                reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+            if (appName) {
+                apps.push_back(std::string(appName));
+            }
+        }
+        return rc == SQLITE_DONE;
+    };
+
+    executePreparedQuery("SELECT DISTINCT app_name FROM key_statistics "
+                           "ORDER BY app_name;", {}, processor);
     return apps;
-
-  const char *querySQL = "SELECT DISTINCT app_name FROM key_statistics "
-                         "ORDER BY app_name;";
-
-  sqlite3_stmt *stmt;
-  int rc = sqlite3_prepare_v2(db, querySQL, -1, &stmt, nullptr);
-  if (rc != SQLITE_OK) {
-    return apps;
-  }
-
-  while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-    const char *appName =
-        reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
-    if (appName) {
-      apps.push_back(std::string(appName));
-    }
-  }
-
-  sqlite3_finalize(stmt);
-  return apps;
-}
-
-int Database::getTotalKeyPresses() {
-  if (!db)
-    return -1;
-
-  const char *querySQL = "SELECT SUM(press_count) FROM key_statistics;";
-  sqlite3_stmt *stmt;
-  int rc = sqlite3_prepare_v2(db, querySQL, -1, &stmt, nullptr);
-  if (rc != SQLITE_OK) {
-    return -1;
-  }
-
-  int total = 0;
-  if (sqlite3_step(stmt) == SQLITE_ROW) {
-    total = sqlite3_column_int(stmt, 0);
-  }
-
-  sqlite3_finalize(stmt);
-  return total;
-}
-
-int Database::getAppKeyPressCount(const std::string &appName) {
-  if (!db)
-    return -1;
-
-  const char *querySQL =
-      "SELECT SUM(press_count) FROM key_statistics WHERE app_name = ?;";
-  sqlite3_stmt *stmt;
-  int rc = sqlite3_prepare_v2(db, querySQL, -1, &stmt, nullptr);
-  if (rc != SQLITE_OK) {
-    return -1;
-  }
-
-  sqlite3_bind_text(stmt, 1, appName.c_str(), -1, SQLITE_STATIC);
-
-  int total = 0;
-  if (sqlite3_step(stmt) == SQLITE_ROW) {
-    total = sqlite3_column_int(stmt, 0);
-  }
-
-  sqlite3_finalize(stmt);
-  return total;
 }
 
 bool Database::clearStatistics() {
-  if (!db)
-    return false;
-
-  const char *deleteSQL = "DELETE FROM key_statistics;";
-  char *errMsg = nullptr;
-  int rc = sqlite3_exec(db, deleteSQL, nullptr, nullptr, &errMsg);
-
-  if (rc != SQLITE_OK) {
-    std::cerr << "Failed to clear statistics: " << errMsg << std::endl;
-    sqlite3_free(errMsg);
-    return false;
-  }
-
-  return true;
+    return executePreparedQuery("DELETE FROM key_statistics;", {});
 }
