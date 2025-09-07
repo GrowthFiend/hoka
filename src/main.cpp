@@ -191,9 +191,10 @@ private:
             std::cout << "ExportCallback: failed to export" << std::endl;
         }
     }
-    
+    std::atomic<bool> shouldExit{false};
     void shutdown() {
         std::cout << "Shutting down application..." << std::endl;
+        shouldExit = true; // Устанавливаем флаг выхода
         
         if (logger) {
             logger->stop();
@@ -206,9 +207,6 @@ private:
         if (window) {
             window->hide();
         }
-        
-        // Выходим из главного цикла FLTK
-        Fl::awake([](void*) { exit(0); }, nullptr);
     }
 
 public:
@@ -228,7 +226,14 @@ public:
     }
     
     int run() {
-        return Fl::run();
+    // Предотвращаем автоматический выход когда все окна скрыты
+        while (!shouldExit) {
+            Fl::wait(0.1);
+            if (!logger || !logger->isActive()) {
+                break; // Выходим только когда приложение действительно завершается
+            }
+        }
+        return 0;
     }
     
     ~HokaApplication() {

@@ -314,7 +314,7 @@ int MainWindow::handle(int event) {
     if (event == FL_CLOSE) {
         if (shouldCloseToTray) {
             minimizeToTray(); // Сворачиваем в трей вместо закрытия
-            return 1; // Предотвращаем стандартную обработку закрытия
+            return 1; // ВАЖНО: возвращаем 1, чтобы предотвратить стандартную обработку
         }
     }
 
