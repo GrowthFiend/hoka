@@ -15,7 +15,6 @@ public:
   bool initialize();
   void updateKeyStatistics(const std::string &appName,
                            const std::string &keyCombination);
-  std::string getTopKeyPresses(int limit = 10);
 
   // Методы для работы с приложениями
   std::string getAppStatistics(const std::string &appName,

@@ -116,7 +116,6 @@ int main() {
     window.setOnExportCallback([&db, &window]() {
         std::ofstream exportFile("hoka_stats.txt");
         if (exportFile) {
-            exportFile << db.getTopKeyPresses(100);
             auto apps = db.getAllApps();
             for (const auto &app : apps) {
                 exportFile << "\nStatistics for " << app << ":\n";

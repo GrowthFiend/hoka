@@ -80,49 +80,6 @@ void Database::updateKeyStatistics(const std::string &appName,
   sqlite3_finalize(stmt);
 }
 
-std::string Database::getTopKeyPresses(int limit) {
-  if (!db) {
-    return "Database not initialized!";
-  }
-
-  std::stringstream ss;
-  const char *querySQL = "SELECT app_name, key_combination, press_count "
-                         "FROM key_statistics "
-                         "ORDER BY press_count DESC, last_pressed DESC "
-                         "LIMIT ?;";
-
-  sqlite3_stmt *stmt;
-  int rc = sqlite3_prepare_v2(db, querySQL, -1, &stmt, nullptr);
-  if (rc != SQLITE_OK) {
-    return "Error querying database";
-  }
-
-  sqlite3_bind_int(stmt, 1, limit);
-
-  bool hasData = false;
-  int rank = 1;
-  while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-    hasData = true;
-    const char *appName = reinterpret_cast<const char *>(
-        sqlite3_column_text(stmt, 0)); // Keep if you want to use it later
-    const char *keyCombination =
-        reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
-    int pressCount = sqlite3_column_int(stmt, 2);
-
-    ss << std::setw(2) << rank << ". " << std::setw(20) << std::left
-       << keyCombination << " in " << appName // Add appName to output to use it
-       << " (" << pressCount << " times)\n";
-    rank++;
-  }
-
-  if (!hasData) {
-    ss << "No key press data recorded yet.\n";
-  }
-
-  sqlite3_finalize(stmt);
-  return ss.str();
-}
-
 std::string Database::getAppStatistics(const std::string &appName, int limit) {
   if (!db)
     return "Database not initialized!";
