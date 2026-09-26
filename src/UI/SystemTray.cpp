@@ -9,7 +9,7 @@
 // Статическая переменная
 SystemTray *SystemTray::instance = nullptr;
 
-SystemTray::SystemTray() : hwnd(nullptr), hIcon(nullptr), isVisible(false) {
+SystemTray::SystemTray() : isVisible(false), hwnd(nullptr), hIcon(nullptr) {
   instance = this;
   WM_TRAYICON = RegisterWindowMessageW(L"Hoka_TrayIcon");
 
@@ -82,31 +82,17 @@ void SystemTray::show() {
     return;
 
   if (!isVisible) {
-    // Сначала устанавливаем версию (для NOTIFYICON_VERSION_4)
-    NOTIFYICONDATAW nid_version = {};
-    nid_version.cbSize = sizeof(nid_version);
-    nid_version.hWnd = hwnd;
-    nid_version.uID = 1;
-    nid_version.uVersion = NOTIFYICON_VERSION_4;
-    
-    if (!Shell_NotifyIconW(NIM_SETVERSION, &nid_version)) {
-      std::cerr << "Failed to set notify icon version" << std::endl;
-      // Пробуем использовать более старую версию
-      nid.uVersion = NOTIFYICON_VERSION;
-    } else {
-      nid.uVersion = NOTIFYICON_VERSION_4;
-    }
-
-    // Теперь добавляем иконку
+    // NIM_SETVERSION намеренно не вызываем: иконка работает в режиме по умолчанию,
+    // где lParam callback-сообщения — это само мышиное сообщение (так его ждёт
+    // TrayWndProc). В NOTIFYICON_VERSION_4 формат lParam другой, и меню сломается.
     if (Shell_NotifyIconW(NIM_ADD, &nid)) {
       isVisible = true;
       std::wcout << L"System tray icon added successfully" << std::endl;
     } else {
       DWORD error = GetLastError();
       std::cerr << "Failed to add system tray icon. Error: " << error << std::endl;
-      
-      // Пробуем без NOTIFYICON_VERSION_4
-      nid.uVersion = 0; // Сбрасываем версию
+
+      // Повторная попытка: при старте системы панель задач может быть ещё не готова
       if (Shell_NotifyIconW(NIM_ADD, &nid)) {
         isVisible = true;
         std::wcout << L"System tray icon added with default version" << std::endl;

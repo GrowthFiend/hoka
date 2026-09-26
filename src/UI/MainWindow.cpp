@@ -261,7 +261,7 @@ void MainWindow::showError(const std::string &errorMessage) {
   setStatus("Error: " + errorMessage);
 }
 
-void MainWindow::clearCallback(Fl_Widget *widget, void *data) {
+void MainWindow::clearCallback(Fl_Widget *, void *data) {
   MainWindow *window = static_cast<MainWindow *>(data);
   if (window->onClearCallback) {
     window->onClearCallback();
@@ -271,14 +271,14 @@ void MainWindow::clearCallback(Fl_Widget *widget, void *data) {
   window->setStatus("Statistics cleared");
 }
 
-void MainWindow::exportCallback(Fl_Widget *widget, void *data) {
+void MainWindow::exportCallback(Fl_Widget *, void *data) {
   MainWindow *window = static_cast<MainWindow *>(data);
   if (window->onExportCallback) {
     window->onExportCallback();
   }
 }
 
-void MainWindow::appChoiceCallback(Fl_Widget *widget, void *data) {
+void MainWindow::appChoiceCallback(Fl_Widget *, void *data) {
   MainWindow *window = static_cast<MainWindow *>(data);
   std::string selectedApp = window->getSelectedApp();
 
