@@ -38,7 +38,8 @@ private:
   Fl_Radio_Round_Button *btnViewKeyboard;
   bool keyboardMode = false;
 
-  // Вид «Клавиатура»: флажок модификаторов и карта
+  // Вид «Клавиатура»: выбор клавиатуры, флажок модификаторов и карта
+  Fl_Choice *keyboardChoice;
   Fl_Check_Button *chkModifiers;
   KeyboardHeatmap *heatmapView;
 
@@ -64,6 +65,7 @@ private:
   static void exportCallback(Fl_Widget *widget, void *data);
   static void appChoiceCallback(Fl_Widget *widget, void *data);
   static void viewModeCallback(Fl_Widget *widget, void *data);
+  static void keyboardChoiceCallback(Fl_Widget *widget, void *data);
   static void modifiersCallback(Fl_Widget *widget, void *data);
 
   SystemTray *systemTray = nullptr;
@@ -72,6 +74,8 @@ private:
   void updateLayout();          // Private helper
   void updateAppChoiceWidget(); // Declare the method
   void setKeyboardMode(bool enable);
+  // Выбор клавиатуры по id; сохраняется между запусками в Fl_Preferences
+  void selectKeyboard(const std::string &keyboardId, bool remember);
 
 public:
   MainWindow(int width, int height, const char *title);

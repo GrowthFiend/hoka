@@ -191,8 +191,68 @@ size_t keyCount(const char *id) {
 
 } // namespace
 
-TEST(KeyboardRegistryTest, StandardKeyCounts) {
+TEST(KeyboardRegistryTest, KeyCounts) {
   EXPECT_EQ(keyCount("ansi104"), 104u);
+  EXPECT_EQ(keyCount("ansi87"), 87u);
+  EXPECT_EQ(keyCount("iso105"), 105u);
+  EXPECT_EQ(keyCount("sofle"), 58u);  // без двух нажатий энкодеров
+  EXPECT_EQ(keyCount("corne"), 42u);  // 3×6 + 3 на половину
+  EXPECT_EQ(keyCount("lily58"), 58u);
+}
+
+TEST(KeyboardRegistryTest, SplitsAreMarked) {
+  for (const char *id : {"sofle", "corne", "lily58"}) {
+    ASSERT_NE(findKeyboard(id), nullptr) << id;
+    EXPECT_TRUE(findKeyboard(id)->isSplit) << id;
+  }
+  for (const char *id : {"ansi104", "ansi87", "iso105"}) {
+    ASSERT_NE(findKeyboard(id), nullptr) << id;
+    EXPECT_FALSE(findKeyboard(id)->isSplit) << id;
+  }
+}
+
+// Клавиши, которые должны попасть в «Нет на этой клавиатуре»
+TEST(KeyboardRegistryTest, MissingKeysOnSplitsAndTkl) {
+  HeatmapStats s = computeHeatmapStats(
+      {{"F5", 3}, {"\xE2\x86\x91", 2}, {"Home", 1}, {"VK_0x61", 4}, {"A", 9},
+       {"Ctrl+S", 1}},
+      true);
+  auto missingOn = [&](const char *id) {
+    std::set<KeyCode> result;
+    for (const MissingKey &m : missingKeys(s, presentStatKeys(*findKeyboard(id)))) {
+      result.insert(m.key);
+    }
+    return result;
+  };
+  // Corne: нет F-ряда, стрелок, навигации и цифрового блока
+  EXPECT_EQ(missingOn("corne"), (std::set<KeyCode>{KC_F5, KC_UP, KC_HOME, KC_P1}));
+  // TKL: нет только цифрового блока
+  EXPECT_EQ(missingOn("ansi87"), (std::set<KeyCode>{KC_P1}));
+  // Полноразмерная: есть всё
+  EXPECT_TRUE(missingOn("ansi104").empty());
+  EXPECT_TRUE(missingOn("iso105").empty());
+}
+
+TEST(KeyboardRegistryTest, IsoHasBothIsoKeys) {
+  std::set<KeyCode> iso = presentStatKeys(*findKeyboard("iso105"));
+  EXPECT_TRUE(iso.count(KC_NUBS));
+  EXPECT_TRUE(iso.count(KC_BSLS)); // через KC_NUHS
+  std::set<KeyCode> ansi = presentStatKeys(*findKeyboard("ansi104"));
+  EXPECT_FALSE(ansi.count(KC_NUBS));
+}
+
+TEST(KeyboardRegistryTest, BothModifierCopiesOnFullSize) {
+  // Левый и правый Ctrl/Shift/Alt/Win есть и красятся одним счётом
+  const KeyboardLayout *ansi = findKeyboard("ansi104");
+  HeatmapStats s = computeHeatmapStats({{"Ctrl+Shift+Alt+Win+X", 5}}, true);
+  int modifierKeys = 0;
+  for (const KeyDef &key : ansi->keys) {
+    if (isModifier(key.code)) {
+      ++modifierKeys;
+      EXPECT_EQ(appearanceFor(key.code, s).count, 5) << keyCodeName(key.code);
+    }
+  }
+  EXPECT_EQ(modifierKeys, 8);
 }
 
 // ---------------------------------------------------------------------------

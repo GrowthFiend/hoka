@@ -70,6 +70,44 @@ int textWidth(const std::string &text) {
   return static_cast<int>(std::ceil(fl_width(text.c_str())));
 }
 
+using LegendScale = KeyboardHeatmap::LegendScale;
+
+// Ширина шкалы: полная — «Заголовок: мало [===] много (N)»,
+// компактная — «Заголовок: [===] N»
+int legendScaleWidth(const LegendScale &s, bool compact) {
+  int w = textWidth(compact ? s.shortTitle : s.title) + 6;
+  if (!s.enabled) {
+    return w + 20 + textWidth("не учитываются");
+  }
+  if (s.max <= 0) {
+    return w + textWidth("нет нажатий");
+  }
+  if (compact) {
+    return w + kBarWidth + 4 + textWidth(formatCount(s.max));
+  }
+  return w + textWidth("мало") + 4 + kBarWidth + 4 +
+         textWidth("много (" + formatCount(s.max) + ")");
+}
+
+// Раскладка легенды: в одну строку, в две или в две компактные
+struct LegendLayout {
+  bool oneRow;
+  bool compact;
+  int rows() const { return oneRow ? 1 : 2; }
+};
+
+LegendLayout legendLayout(const LegendScale &keys, const LegendScale &mods,
+                          int width) {
+  const int gap = 24;
+  if (legendScaleWidth(keys, false) + gap + legendScaleWidth(mods, false) <=
+      width) {
+    return {true, false};
+  }
+  const bool fits = legendScaleWidth(keys, false) <= width &&
+                    legendScaleWidth(mods, false) <= width;
+  return {false, !fits};
+}
+
 // Раскладка «фишек» по строкам: сколько строк нужно при данной ширине
 int flowLines(const std::vector<int> &widths, int width) {
   int lines = 1;
@@ -216,8 +254,8 @@ int KeyboardHeatmap::footerHeight(int width) const {
   int height = 0;
 
   // Легенда: одна строка, если обе шкалы помещаются, иначе две
-  const int scaleWidth = kBarWidth + 90 + textWidth("Модификаторы (сочетаний):");
-  height += (width >= 2 * scaleWidth) ? kRowHeight : 2 * kRowHeight;
+  height += legendLayout(keysScale(), modifiersScale(), width).rows() *
+            kRowHeight;
 
   if (!missing_.empty()) {
     std::vector<int> widths = {textWidth(kMissingTitle)};
@@ -248,10 +286,7 @@ void KeyboardHeatmap::draw() {
   }
 
   int fy = y() + h() - kPad - footer;
-  drawLegend(x() + kPad, fy, innerW);
-  fl_font(FL_HELVETICA, kFontSize);
-  const int scaleWidth = kBarWidth + 90 + textWidth("Модификаторы (сочетаний):");
-  fy += (innerW >= 2 * scaleWidth) ? kRowHeight : 2 * kRowHeight;
+  fy += drawLegend(x() + kPad, fy, innerW);
   drawMissing(x() + kPad, fy, innerW, y() + h() - kPad - fy);
 
   fl_pop_clip();
@@ -394,23 +429,33 @@ void KeyboardHeatmap::drawKey(size_t index) {
   }
 }
 
-void KeyboardHeatmap::drawLegend(int X, int Y, int W) {
-  fl_font(FL_HELVETICA, kFontSize);
-  const int scaleWidth = kBarWidth + 90 + textWidth("Модификаторы (сочетаний):");
-  const bool oneRow = W >= 2 * scaleWidth;
-  legendArea_ = {X, Y, oneRow ? 2 * scaleWidth : scaleWidth,
-                 oneRow ? kRowHeight : 2 * kRowHeight};
+KeyboardHeatmap::LegendScale KeyboardHeatmap::keysScale() const {
+  return {"Клавиши:", "Клавиши:", ColorScale::Keys, stats_.maxKeyCount, true};
+}
 
-  auto drawScale = [&](int sx, int sy, const char *title, ColorScale scale,
-                       int64_t max, bool enabled) {
+KeyboardHeatmap::LegendScale KeyboardHeatmap::modifiersScale() const {
+  return {"Модификаторы (сочетаний):", "Модификаторы:", ColorScale::Modifiers,
+          stats_.maxModifierCount, includeModifiers_};
+}
+
+int KeyboardHeatmap::drawLegend(int X, int Y, int W) {
+  fl_font(FL_HELVETICA, kFontSize);
+  const LegendScale keys = keysScale();
+  const LegendScale mods = modifiersScale();
+  const LegendLayout layout = legendLayout(keys, mods, W);
+
+  auto drawScale = [&](int sx, int sy, const LegendScale &s) {
     const int baseline = sy + kRowHeight / 2 + kFontSize / 2 - 1;
+    const char *title = layout.compact ? s.shortTitle : s.title;
+    const ColorScale scale = s.scale;
+    const int64_t max = s.max;
     fl_color(FL_BLACK);
     fl_font(FL_HELVETICA, kFontSize);
     fl_draw(title, sx, baseline);
     int x = sx + textWidth(title) + 6;
     const int barY = sy + (kRowHeight - kBarHeight) / 2;
 
-    if (!enabled) {
+    if (!s.enabled) {
       fl_color(toFl(neutralColor()));
       fl_rectf(x, barY, 14, kBarHeight);
       fl_color(fl_rgb_color(140, 140, 140));
@@ -425,9 +470,11 @@ void KeyboardHeatmap::drawLegend(int X, int Y, int W) {
       return;
     }
 
-    fl_color(FL_DARK3);
-    fl_draw("мало", x, baseline);
-    x += textWidth("мало") + 4;
+    if (!layout.compact) {
+      fl_color(FL_DARK3);
+      fl_draw("мало", x, baseline);
+      x += textWidth("мало") + 4;
+    }
     for (int i = 0; i < kBarWidth; ++i) {
       fl_color(toFl(scaleColor(scale, i / double(kBarWidth - 1))));
       fl_yxline(x + i, barY, barY + kBarHeight - 1);
@@ -436,19 +483,20 @@ void KeyboardHeatmap::drawLegend(int X, int Y, int W) {
     fl_rect(x - 1, barY - 1, kBarWidth + 2, kBarHeight + 2);
     x += kBarWidth + 4;
     fl_color(FL_DARK3);
-    std::string most = "много (" + formatCount(max) + ")";
+    std::string most = layout.compact ? formatCount(max)
+                                      : "много (" + formatCount(max) + ")";
     fl_draw(most.c_str(), x, baseline);
   };
 
-  drawScale(X, Y, "Клавиши:", ColorScale::Keys, stats_.maxKeyCount, true);
-  if (oneRow) {
-    drawScale(X + scaleWidth, Y, "Модификаторы (сочетаний):",
-              ColorScale::Modifiers, stats_.maxModifierCount,
-              includeModifiers_);
+  const int keysWidth = legendScaleWidth(keys, layout.compact);
+  const int modsWidth = legendScaleWidth(mods, layout.compact);
+  drawScale(X, Y, keys);
+  if (layout.oneRow) {
+    drawScale(X + keysWidth + 24, Y, mods);
+    legendArea_ = {X, Y, keysWidth + 24 + modsWidth, kRowHeight};
   } else {
-    drawScale(X, Y + kRowHeight, "Модификаторы (сочетаний):",
-              ColorScale::Modifiers, stats_.maxModifierCount,
-              includeModifiers_);
+    drawScale(X, Y + kRowHeight, mods);
+    legendArea_ = {X, Y, std::max(keysWidth, modsWidth), 2 * kRowHeight};
   }
 
   if (appName_.empty()) {
@@ -458,6 +506,7 @@ void KeyboardHeatmap::drawLegend(int X, int Y, int W) {
     fl_draw("Выберите приложение", X, Y, W, kRowHeight,
             FL_ALIGN_RIGHT | FL_ALIGN_INSIDE);
   }
+  return layout.rows() * kRowHeight;
 }
 
 void KeyboardHeatmap::drawMissing(int X, int Y, int W, int H) {
@@ -542,6 +591,10 @@ void KeyboardHeatmap::drawMissing(int X, int Y, int W, int H) {
                        ") \xE2\x80\x94 на карте не показаны";
     fl_color(FL_DARK3);
     fl_font(FL_HELVETICA_ITALIC, kFontSize);
+    if (fl_width(text.c_str()) > W) {
+      text = "Не распознано: " + formatCount(stats_.unrecognizedCombinations) +
+             " (нажатий: " + formatCount(stats_.unrecognizedPresses) + ")";
+    }
     fl_draw(text.c_str(), X, y, W, kRowHeight, FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
   }
 }

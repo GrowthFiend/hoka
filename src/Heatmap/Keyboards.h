@@ -73,7 +73,12 @@ struct Bounds {
 };
 Bounds layoutBounds(const KeyboardLayout &layout);
 
-// Таблицы клавиатур (по файлу на семейство в Heatmap/Layouts)
+// Таблицы клавиатур (Heatmap/Layouts)
 const KeyboardLayout &ansi104Layout();
+const KeyboardLayout &ansiTklLayout();
+const KeyboardLayout &iso105Layout();
+const KeyboardLayout &sofleLayout();
+const KeyboardLayout &corneLayout();
+const KeyboardLayout &lily58Layout();
 
 } // namespace heatmap

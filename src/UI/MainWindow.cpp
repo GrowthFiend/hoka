@@ -1,9 +1,22 @@
 #include "MainWindow.h"
 #include "Heatmap/Keyboards.h"
 #include <FL/Fl.H>
+#include <FL/Fl_Preferences.H>
 #include <FL/fl_ask.H>
 #include <algorithm>
 #include <iostream>
+
+namespace {
+// Где хранится выбранная клавиатура между запусками
+// (на Windows — %APPDATA%\hoka\hoka.prefs)
+const char *const kPrefsVendor = "hoka";
+const char *const kPrefsApplication = "hoka";
+const char *const kPrefsKeyboard = "keyboard";
+
+const char *const kSplitKeymapNote =
+    "Для сплитов показан базовый слой default keymap QMK "
+    "\xE2\x80\x94 у вас раскладка может отличаться.";
+} // namespace
 
 MainWindow::MainWindow(int width, int height, const char *title)
     : Fl_Window(width, height, title) {
@@ -70,15 +83,24 @@ MainWindow::MainWindow(int width, int height, const char *title)
   appStats->textsize(11);
   appStats->value("Select an application to view statistics");
 
-  // Вид «Клавиатура»: флажок модификаторов и тепловая карта
+  // Вид «Клавиатура»: выбор клавиатуры, флажок модификаторов и тепловая карта
+  keyboardChoice = new Fl_Choice(0, 115, 100, 25, "Клавиатура:");
+  keyboardChoice->labelsize(12);
+  keyboardChoice->textsize(12);
+  keyboardChoice->align(FL_ALIGN_LEFT);
+  for (const heatmap::KeyboardLayout *keyboard : heatmap::allKeyboards()) {
+    keyboardChoice->add(keyboard->name);
+  }
+  keyboardChoice->callback(keyboardChoiceCallback, this);
+
   chkModifiers = new Fl_Check_Button(0, 115, 185, 25, "Учитывать модификаторы");
   chkModifiers->labelsize(12);
   chkModifiers->value(1);
   chkModifiers->callback(modifiersCallback, this);
 
   heatmapView = new KeyboardHeatmap(0, 145, 100, 100);
-  heatmapView->setKeyboard(&heatmap::ansi104Layout());
 
+  keyboardChoice->hide();
   chkModifiers->hide();
   heatmapView->hide();
 
@@ -99,6 +121,16 @@ MainWindow::MainWindow(int width, int height, const char *title)
   statusBox->labelsize(10);
 
   end();
+
+  // Клавиатура, выбранная в прошлый раз
+  {
+    Fl_Preferences prefs(Fl_Preferences::USER, kPrefsVendor,
+                         kPrefsApplication);
+    char keyboardId[64];
+    prefs.get(kPrefsKeyboard, keyboardId, heatmap::allKeyboards().front()->id,
+              sizeof(keyboardId));
+    selectKeyboard(keyboardId, false);
+  }
 
   resizable(this); // Make window resizable
   updateLayout();  // Initial layout
@@ -169,10 +201,22 @@ void MainWindow::updateLayout() {
   appChoice->resize(innerX, 85, innerW, 25);
   appStats->resize(innerX, 115, innerW, h - 200);
 
-  // Вид «Клавиатура»: флажок модификаторов над картой
+  // Вид «Клавиатура»: выбор клавиатуры и флажок в одну строку, если
+  // помещаются, иначе флажок переносится на следующую строку
+  const int choiceLabelW = 80;
   const int checkW = 185;
-  const int heatmapY = 145;
-  chkModifiers->resize(innerX, 115, std::min(innerW, checkW), 25);
+  const int minChoiceW = 150;
+  int heatmapY = 145;
+  if (innerW >= choiceLabelW + minChoiceW + 10 + checkW) {
+    keyboardChoice->resize(innerX + choiceLabelW, 115,
+                           innerW - choiceLabelW - checkW - 10, 25);
+    chkModifiers->resize(innerX + innerW - checkW, 115, checkW, 25);
+  } else {
+    keyboardChoice->resize(innerX + choiceLabelW, 115,
+                           std::max(60, innerW - choiceLabelW), 25);
+    chkModifiers->resize(innerX, 145, std::min(innerW, checkW), 25);
+    heatmapY = 175;
+  }
   // Низ карты совпадает с низом текстовой статистики
   heatmapView->resize(innerX, heatmapY, innerW,
                       std::max(0, (h - 85) - heatmapY));
@@ -308,14 +352,38 @@ void MainWindow::setKeyboardMode(bool enable) {
   btnViewKeyboard->value(enable ? 1 : 0);
   if (enable) {
     appStats->hide();
+    keyboardChoice->show();
     chkModifiers->show();
     heatmapView->show();
   } else {
+    keyboardChoice->hide();
     chkModifiers->hide();
     heatmapView->hide();
     appStats->show();
   }
   updateLayout();
+}
+
+void MainWindow::selectKeyboard(const std::string &keyboardId, bool remember) {
+  const auto &keyboards = heatmap::allKeyboards();
+  size_t index = 0; // неизвестный id — первая клавиатура списка
+  for (size_t i = 0; i < keyboards.size(); ++i) {
+    if (keyboardId == keyboards[i]->id) {
+      index = i;
+      break;
+    }
+  }
+  const heatmap::KeyboardLayout *keyboard = keyboards[index];
+  keyboardChoice->value(static_cast<int>(index));
+  keyboardChoice->tooltip(keyboard->isSplit ? kSplitKeymapNote : nullptr);
+  heatmapView->setKeyboard(keyboard);
+
+  if (remember) {
+    Fl_Preferences prefs(Fl_Preferences::USER, kPrefsVendor,
+                         kPrefsApplication);
+    prefs.set(kPrefsKeyboard, keyboard->id);
+    prefs.flush();
+  }
 }
 
 std::string MainWindow::getSelectedApp() const {
@@ -374,6 +442,15 @@ void MainWindow::appChoiceCallback(Fl_Widget *, void *data) {
 void MainWindow::viewModeCallback(Fl_Widget *widget, void *data) {
   MainWindow *window = static_cast<MainWindow *>(data);
   window->setKeyboardMode(widget == window->btnViewKeyboard);
+}
+
+void MainWindow::keyboardChoiceCallback(Fl_Widget *, void *data) {
+  MainWindow *window = static_cast<MainWindow *>(data);
+  const auto &keyboards = heatmap::allKeyboards();
+  int index = window->keyboardChoice->value();
+  if (index >= 0 && index < static_cast<int>(keyboards.size())) {
+    window->selectKeyboard(keyboards[index]->id, true);
+  }
 }
 
 void MainWindow::modifiersCallback(Fl_Widget *, void *data) {

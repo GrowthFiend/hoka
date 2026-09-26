@@ -29,6 +29,15 @@ public:
   void draw() override;
   int handle(int event) override;
 
+  // Шкала в легенде (нужна вспомогательным функциям отрисовки)
+  struct LegendScale {
+    const char *title;      // полная подпись
+    const char *shortTitle; // подпись для узкой легенды
+    heatmap::ColorScale scale;
+    int64_t max;
+    bool enabled;
+  };
+
 private:
   struct Area {
     int x = 0, y = 0, w = 0, h = 0;
@@ -65,7 +74,10 @@ private:
   int footerHeight(int width) const;
   void drawKeyboard(int X, int Y, int W, int H);
   void drawKey(size_t index);
-  void drawLegend(int X, int Y, int W);
+  // Возвращает высоту нарисованной легенды
+  int drawLegend(int X, int Y, int W);
+  LegendScale keysScale() const;
+  LegendScale modifiersScale() const;
   void drawMissing(int X, int Y, int W, int H);
   std::vector<std::string> missingItems() const;
 };

@@ -8,7 +8,8 @@ namespace heatmap {
 
 const std::vector<const KeyboardLayout *> &allKeyboards() {
   static const std::vector<const KeyboardLayout *> keyboards = {
-      &ansi104Layout(),
+      &ansi104Layout(), &ansiTklLayout(), &iso105Layout(),
+      &sofleLayout(),   &corneLayout(),   &lily58Layout(),
   };
   return keyboards;
 }

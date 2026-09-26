@@ -48,6 +48,9 @@ set(HEATMAP_SOURCES
     src/Heatmap/KeyStats.cpp
     src/Heatmap/Keyboards.cpp
     src/Heatmap/Layouts/StandardLayouts.cpp
+    src/Heatmap/Layouts/Sofle.cpp
+    src/Heatmap/Layouts/Corne.cpp
+    src/Heatmap/Layouts/Lily58.cpp
 )
 
 set(HEATMAP_HEADERS
