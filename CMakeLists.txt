@@ -46,11 +46,14 @@ endif()
 set(HEATMAP_SOURCES
     src/Heatmap/KeyCodes.cpp
     src/Heatmap/KeyStats.cpp
+    src/Heatmap/Keyboards.cpp
+    src/Heatmap/Layouts/StandardLayouts.cpp
 )
 
 set(HEATMAP_HEADERS
     src/Heatmap/KeyCodes.h
     src/Heatmap/KeyStats.h
+    src/Heatmap/Keyboards.h
 )
 
 set(SOURCES
@@ -59,6 +62,7 @@ set(SOURCES
     src/KeyLogger/KeyLogger.cpp
     src/UI/MainWindow.cpp
     src/UI/SystemTray.cpp
+    src/UI/KeyboardHeatmap.cpp
     ${HEATMAP_SOURCES}
 )
 
@@ -67,6 +71,7 @@ set(HEADERS
     src/KeyLogger/KeyLogger.h
     src/UI/MainWindow.h
     src/UI/SystemTray.h
+    src/UI/KeyboardHeatmap.h
     src/Models/KeyStatistics.h
     src/Models/KeyPress.h
     ${HEATMAP_HEADERS}
@@ -77,6 +82,7 @@ set(TEST_SOURCES
     Testing/Database/DatabaseTests.cpp
     Testing/Heatmap/KeyCodesTests.cpp
     Testing/Heatmap/KeyStatsTests.cpp
+    Testing/Heatmap/KeyboardsTests.cpp
 )
 
 # ==============================================================================
@@ -108,6 +114,8 @@ target_compile_definitions(hoka_tests PRIVATE
     UNICODE
     _UNICODE
     NTDDI_VERSION=0x06000000
+    # Тест покрытия ANSI читает имена клавиш из KeyLogger.cpp
+    HOKA_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 # ==============================================================================
@@ -238,6 +246,8 @@ source_group("UI" FILES
     src/UI/MainWindow.h
     src/UI/SystemTray.cpp 
     src/UI/SystemTray.h
+    src/UI/KeyboardHeatmap.cpp
+    src/UI/KeyboardHeatmap.h
 )
 
 source_group("Models" FILES 

@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "Heatmap/Keyboards.h"
 #include <FL/Fl.H>
 #include <FL/fl_ask.H>
 #include <algorithm>
@@ -42,9 +43,19 @@ MainWindow::MainWindow(int width, int height, const char *title)
 
   statsTitle = new Fl_Box(25 + (width - 30) / 2, 55, (width - 30) / 2 - 10, 25,
                           "App Statistics");
-  statsTitle->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE);
+  statsTitle->align(FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP);
   statsTitle->labelfont(FL_BOLD);
   statsTitle->labelsize(12);
+
+  // Переключатель вида статистики (координаты задаёт updateLayout)
+  btnViewText = new Fl_Radio_Round_Button(0, 55, 70, 25, "Текст");
+  btnViewText->labelsize(12);
+  btnViewText->value(1);
+  btnViewText->callback(viewModeCallback, this);
+
+  btnViewKeyboard = new Fl_Radio_Round_Button(0, 55, 100, 25, "Клавиатура");
+  btnViewKeyboard->labelsize(12);
+  btnViewKeyboard->callback(viewModeCallback, this);
 
   // App selection dropdown
   appChoice =
@@ -58,6 +69,18 @@ MainWindow::MainWindow(int width, int height, const char *title)
                                      (width - 30) / 2 - 10, height - 200);
   appStats->textsize(11);
   appStats->value("Select an application to view statistics");
+
+  // Вид «Клавиатура»: флажок модификаторов и тепловая карта
+  chkModifiers = new Fl_Check_Button(0, 115, 185, 25, "Учитывать модификаторы");
+  chkModifiers->labelsize(12);
+  chkModifiers->value(1);
+  chkModifiers->callback(modifiersCallback, this);
+
+  heatmapView = new KeyboardHeatmap(0, 145, 100, 100);
+  heatmapView->setKeyboard(&heatmap::ansi104Layout());
+
+  chkModifiers->hide();
+  heatmapView->hide();
 
   rightGroup->end();
 
@@ -76,7 +99,7 @@ MainWindow::MainWindow(int width, int height, const char *title)
   statusBox->labelsize(10);
 
   end();
-  
+
   resizable(this); // Make window resizable
   updateLayout();  // Initial layout
 }
@@ -116,16 +139,43 @@ void MainWindow::updateLayout() {
   int w = this->w();
   int h = this->h();
 
+  // В виде «Клавиатура» правой панели отдаём 2/3 ширины: карте нужно место.
+  // В текстовом виде панели делят окно пополам, как раньше.
+  int panelsW = w - 30;
+  int rightW = keyboardMode ? panelsW * 2 / 3 : panelsW / 2;
+  int leftW = keyboardMode ? panelsW - rightW : panelsW / 2;
+  int rightX = 20 + leftW;
+  int innerX = rightX + 5;
+  int innerW = rightW - 10;
+
   titleBox->resize(10, 10, w - 20, 30);
 
-  leftGroup->resize(10, 50, (w - 30) / 2, h - 120);
-  recentTitle->resize(15, 55, (w - 30) / 2 - 10, 25);
-  recentActivity->resize(15, 85, (w - 30) / 2 - 10, h - 170);
+  leftGroup->resize(10, 50, leftW, h - 120);
+  recentTitle->resize(15, 55, leftW - 10, 25);
+  recentActivity->resize(15, 85, leftW - 10, h - 170);
 
-  rightGroup->resize(20 + (w - 30) / 2, 50, (w - 30) / 2, h - 120);
-  statsTitle->resize(25 + (w - 30) / 2, 55, (w - 30) / 2 - 10, 25);
-  appChoice->resize(25 + (w - 30) / 2, 85, (w - 30) / 2 - 10, 25);
-  appStats->resize(25 + (w - 30) / 2, 115, (w - 30) / 2 - 10, h - 200);
+  rightGroup->resize(rightX, 50, rightW, h - 120);
+
+  // Первая строка: заголовок слева, переключатель вида справа
+  const int textButtonW = 70;
+  const int keyboardButtonW = 100;
+  btnViewText->resize(innerX + innerW - textButtonW - keyboardButtonW, 55,
+                      textButtonW, 25);
+  btnViewKeyboard->resize(innerX + innerW - keyboardButtonW, 55,
+                          keyboardButtonW, 25);
+  statsTitle->resize(innerX, 55,
+                     std::max(0, innerW - textButtonW - keyboardButtonW), 25);
+
+  appChoice->resize(innerX, 85, innerW, 25);
+  appStats->resize(innerX, 115, innerW, h - 200);
+
+  // Вид «Клавиатура»: флажок модификаторов над картой
+  const int checkW = 185;
+  const int heatmapY = 145;
+  chkModifiers->resize(innerX, 115, std::min(innerW, checkW), 25);
+  // Низ карты совпадает с низом текстовой статистики
+  heatmapView->resize(innerX, heatmapY, innerW,
+                      std::max(0, (h - 85) - heatmapY));
 
   btnClear->resize(10, h - 60, 80, 30);
   btnExport->resize(100, h - 60, 80, 30);
@@ -246,6 +296,28 @@ void MainWindow::updateAppStatistics(const std::string &appName,
   appStats->redraw();
 }
 
+void MainWindow::updateAppKeyCounts(
+    const std::string &appName,
+    const std::vector<std::pair<std::string, int>> &keyCounts) {
+  heatmapView->setKeyCounts(appName, keyCounts);
+}
+
+void MainWindow::setKeyboardMode(bool enable) {
+  keyboardMode = enable;
+  btnViewText->value(enable ? 0 : 1);
+  btnViewKeyboard->value(enable ? 1 : 0);
+  if (enable) {
+    appStats->hide();
+    chkModifiers->show();
+    heatmapView->show();
+  } else {
+    chkModifiers->hide();
+    heatmapView->hide();
+    appStats->show();
+  }
+  updateLayout();
+}
+
 std::string MainWindow::getSelectedApp() const {
   if (appChoice->value() <= 0 ||
       appChoice->value() > (int)availableApps.size()) {
@@ -279,6 +351,7 @@ void MainWindow::clearCallback(Fl_Widget *, void *data) {
   }
   window->clearRecentActivity();
   window->updateAppStatistics("", "");
+  window->updateAppKeyCounts("", {});
   window->setStatus("Statistics cleared");
 }
 
@@ -296,6 +369,16 @@ void MainWindow::appChoiceCallback(Fl_Widget *, void *data) {
   if (!selectedApp.empty() && window->onAppSelectedCallback) {
     window->onAppSelectedCallback(selectedApp);
   }
+}
+
+void MainWindow::viewModeCallback(Fl_Widget *widget, void *data) {
+  MainWindow *window = static_cast<MainWindow *>(data);
+  window->setKeyboardMode(widget == window->btnViewKeyboard);
+}
+
+void MainWindow::modifiersCallback(Fl_Widget *, void *data) {
+  MainWindow *window = static_cast<MainWindow *>(data);
+  window->heatmapView->setIncludeModifiers(window->chkModifiers->value() != 0);
 }
 
 // Callback setters

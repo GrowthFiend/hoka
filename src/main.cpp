@@ -76,9 +76,7 @@ private:
         // Callback для выбора приложения
         window->setOnAppSelectedCallback([this](const std::string& app) {
             std::cout << "AppSelectedCallback: selected app = " << app << std::endl;
-            std::string stats = db->getAppStatistics(app);
-            std::cout << "AppSelectedCallback: stats = " << stats << std::endl;
-            window->updateAppStatistics(app, stats);
+            showAppStatistics(app);
         });
         
         // Callback для очистки статистики
@@ -87,6 +85,7 @@ private:
                 std::cout << "ClearCallback: statistics cleared" << std::endl;
                 window->clearRecentActivity();
                 window->updateAppStatistics("", "");
+                window->updateAppKeyCounts("", {});
                 window->setStatus("Statistics cleared");
             }
         });
@@ -97,6 +96,12 @@ private:
         });
     }
     
+    // Текстовая статистика и данные тепловой карты выбранного приложения
+    void showAppStatistics(const std::string& app) {
+        window->updateAppStatistics(app, db->getAppStatistics(app));
+        window->updateAppKeyCounts(app, db->getAppKeyCounts(app));
+    }
+
     void setupSystemTrayCallbacks() {
         tray->onRestoreCallback = [this]() { 
             window->restoreFromTray(); 
@@ -176,8 +181,7 @@ private:
             // Обновляем статистику выбранного приложения
             std::string selectedApp = window->getSelectedApp();
             if (!selectedApp.empty()) {
-                std::string stats = db->getAppStatistics(selectedApp);
-                window->updateAppStatistics(selectedApp, stats);
+                showAppStatistics(selectedApp);
             }
         }
         
