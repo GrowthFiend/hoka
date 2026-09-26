@@ -200,14 +200,25 @@ void MainWindow::addRecentKeyPress(const std::string &appName,
 void MainWindow::updateAppChoiceWidget() {
   if (!appChoice)
     return;
+  // Запоминаем выбранное приложение по имени: список пересоздаётся при
+  // каждом нажатии, и без этого выбор сбрасывался на "Select an app..."
+  std::string selected;
+  if (appChoice->value() > 0 && appChoice->text()) {
+    selected = appChoice->text();
+  }
+
   appChoice->clear();
   appChoice->add("Select an app...");
 
-  for (const auto &app : availableApps) {
-    appChoice->add(app.c_str());
+  int selectedIndex = 0;
+  for (size_t i = 0; i < availableApps.size(); ++i) {
+    appChoice->add(availableApps[i].c_str());
+    if (!selected.empty() && availableApps[i] == selected) {
+      selectedIndex = static_cast<int>(i) + 1; // +1: первый пункт "Select an app..."
+    }
   }
 
-  appChoice->value(0);
+  appChoice->value(selectedIndex);
   appChoice->redraw();
 }
 
