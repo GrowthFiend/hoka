@@ -72,7 +72,7 @@ As the project is in early development, the build process is primarily intended 
     ```bash
     ctest --preset gcc-preset
     ```
-    The tests use `keypress_stats.db` in their working directory (`out/build/gcc-preset/`) and clear it, so don't run them against a database you care about.
+    The tests use their own temporary `hoka_test.db` and never touch the app's `keypress_stats.db`.
 
 5.  **Run the app:** `hoka.exe` installs a global keyboard hook and should be run **as administrator**. It creates `keypress_stats.db` in the current working directory.
 

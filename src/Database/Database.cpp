@@ -126,8 +126,8 @@ std::string Database::formatStatisticsOutput(const std::vector<std::pair<std::st
     return ss.str();
 }
 
-bool Database::initialize() {
-    if (!openDatabase("keypress_stats.db")) {
+bool Database::initialize(const std::string& dbPath) {
+    if (!openDatabase(dbPath)) {
         return false;
     }
     

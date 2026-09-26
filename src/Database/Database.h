@@ -29,7 +29,7 @@ public:
   ~Database();
 
   // Основные модифицирующие методы
-  bool initialize();
+  bool initialize(const std::string &dbPath = "keypress_stats.db");
   void updateKeyStatistics(const std::string &appName,
                            const std::string &keyCombination);
   bool clearStatistics();
