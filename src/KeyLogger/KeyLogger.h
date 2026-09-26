@@ -18,15 +18,21 @@ using KeyEventCallback = std::function<void(const KeyPressEvent&)>;
 
 class KeyLogger {
 private:
+    // Сырое событие из hook: имя процесса определяется позже, в потоке обработки
+    struct RawKeyEvent {
+        DWORD processId;
+        std::string keyCombination;
+    };
+
     HHOOK keyboardHook;
     std::atomic<bool> isRunning{false};
     std::atomic<bool> shouldStop{false};
-    
+
     // Поток для обработки событий
     std::thread processingThread;
-    
+
     // Очередь событий и синхронизация
-    std::queue<KeyPressEvent> eventQueue;
+    std::queue<RawKeyEvent> eventQueue;
     std::mutex queueMutex;
     std::condition_variable queueCondition;
     
@@ -43,7 +49,7 @@ private:
     void processEvents();
     
     // Добавление события в очередь (вызывается из hook)
-    void addEvent(const KeyPressEvent& event);
+    void addEvent(const RawKeyEvent& event);
 
 public:
     KeyLogger();

@@ -124,12 +124,28 @@ private:
         }
     }
     
+    // Событие, переданное из потока KeyLogger в главный поток через Fl::awake
+    struct PendingKeyEvent {
+        HokaApplication* app;
+        KeyPressEvent event;
+    };
+
+    static void onKeyEventAwake(void* data) {
+        std::unique_ptr<PendingKeyEvent> pending(static_cast<PendingKeyEvent*>(data));
+        pending->app->handleKeyEvent(pending->event);
+    }
+
     bool initializeKeyLogger() {
         logger = std::make_unique<KeyLogger>();
-        
-        // Устанавливаем callback для обработки событий клавиатуры
+
+        // Callback вызывается в потоке KeyLogger, а FLTK не потокобезопасен,
+        // поэтому обработка (БД и UI) выполняется в главном потоке через Fl::awake
         auto keyEventCallback = [this](const KeyPressEvent& event) {
-            handleKeyEvent(event);
+            auto* pending = new PendingKeyEvent{this, event};
+            if (Fl::awake(onKeyEventAwake, pending) != 0) {
+                std::cerr << "FLTK awake queue is full, key event dropped" << std::endl;
+                delete pending;
+            }
         };
         
         if (!logger->start(keyEventCallback)) {
@@ -245,6 +261,10 @@ public:
 };
 
 int main() {
+    // Включаем поддержку потоков в FLTK: без этого Fl::awake() не доставляет
+    // события из потока KeyLogger в главный поток
+    Fl::lock();
+
     HokaApplication app;
     
     if (!app.initialize()) {

@@ -74,7 +74,7 @@ bool KeyLogger::isActive() const {
     return isRunning;
 }
 
-void KeyLogger::addEvent(const KeyPressEvent& event) {
+void KeyLogger::addEvent(const RawKeyEvent& event) {
     std::unique_lock<std::mutex> lock(queueMutex);
     eventQueue.push(event);
     queueCondition.notify_one();
@@ -91,12 +91,16 @@ void KeyLogger::processEvents() {
         
         // Обрабатываем все события в очереди
         while (!eventQueue.empty() && !shouldStop) {
-            KeyPressEvent event = eventQueue.front();
+            RawKeyEvent raw = eventQueue.front();
             eventQueue.pop();
-            
+
             // Освобождаем mutex перед вызовом callback
             lock.unlock();
-            
+
+            // Имя процесса определяем здесь, а не в hook: hook должен отрабатывать
+            // быстро, иначе Windows снимет его по таймауту LowLevelHooksTimeout
+            KeyPressEvent event{getProcessName(raw.processId), raw.keyCombination};
+
             // Вызываем callback если установлен
             if (eventCallback) {
                 try {
@@ -127,8 +131,7 @@ LRESULT CALLBACK KeyLogger::keyboardProc(int nCode, WPARAM wParam, LPARAM lParam
         if (foregroundWindow) {
             DWORD processId;
             GetWindowThreadProcessId(foregroundWindow, &processId);
-            std::string appName = getProcessName(processId);
-            
+
             // Получаем состояние модификаторов
             bool ctrlPressed = GetAsyncKeyState(VK_CONTROL) & 0x8000;
             bool shiftPressed = GetAsyncKeyState(VK_SHIFT) & 0x8000;
@@ -155,8 +158,7 @@ LRESULT CALLBACK KeyLogger::keyboardProc(int nCode, WPARAM wParam, LPARAM lParam
             keyCombination += mainKey;
             
             // Добавляем событие в очередь
-            KeyPressEvent event{appName, keyCombination};
-            instance->addEvent(event);
+            instance->addEvent(RawKeyEvent{processId, keyCombination});
         }
     }
     
