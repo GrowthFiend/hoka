@@ -42,12 +42,24 @@ endif()
 # ==============================================================================
 # SOURCE FILES
 # ==============================================================================
+# Логика тепловой карты: без FLTK и Windows, поэтому собирается и в тесты
+set(HEATMAP_SOURCES
+    src/Heatmap/KeyCodes.cpp
+    src/Heatmap/KeyStats.cpp
+)
+
+set(HEATMAP_HEADERS
+    src/Heatmap/KeyCodes.h
+    src/Heatmap/KeyStats.h
+)
+
 set(SOURCES
     src/main.cpp
     src/Database/Database.cpp
     src/KeyLogger/KeyLogger.cpp
     src/UI/MainWindow.cpp
     src/UI/SystemTray.cpp
+    ${HEATMAP_SOURCES}
 )
 
 set(HEADERS
@@ -57,11 +69,14 @@ set(HEADERS
     src/UI/SystemTray.h
     src/Models/KeyStatistics.h
     src/Models/KeyPress.h
+    ${HEATMAP_HEADERS}
 )
 
 set(TEST_SOURCES
     Testing/main_test.cpp
     Testing/Database/DatabaseTests.cpp
+    Testing/Heatmap/KeyCodesTests.cpp
+    Testing/Heatmap/KeyStatsTests.cpp
 )
 
 # ==============================================================================
@@ -76,6 +91,7 @@ add_executable(hoka WIN32
 add_executable(hoka_tests
     ${TEST_SOURCES}
     src/Database/Database.cpp
+    ${HEATMAP_SOURCES}
     ${HEADERS}
 )
 
@@ -227,6 +243,11 @@ source_group("UI" FILES
 source_group("Models" FILES 
     src/Models/KeyStatistics.h
     src/Models/KeyPress.h
+)
+
+source_group("Heatmap" FILES
+    ${HEATMAP_SOURCES}
+    ${HEATMAP_HEADERS}
 )
 
 source_group("Test Files" FILES ${TEST_SOURCES})

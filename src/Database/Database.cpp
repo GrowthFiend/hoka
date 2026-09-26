@@ -156,6 +156,11 @@ std::string Database::getAppStatistics(const std::string &appName, int limit) {
     return formatStatisticsOutput(data, appName);
 }
 
+std::vector<std::pair<std::string, int>>
+Database::getAppKeyCounts(const std::string &appName) {
+    return fetchAppKeyData(appName, -1);
+}
+
 std::vector<std::string> Database::getAllApps() {
     std::vector<std::string> apps;
     auto processor = [&](sqlite3_stmt* stmt) -> bool {

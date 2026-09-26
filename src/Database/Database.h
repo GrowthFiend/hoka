@@ -38,5 +38,8 @@ public:
   bool isConnected() const { return db != nullptr; }
   std::string getAppStatistics(const std::string &appName,
                                int limit = -1); // -1 = без ограничений
+  // Все пары (комбинация, число нажатий) приложения, по убыванию числа
+  std::vector<std::pair<std::string, int>>
+  getAppKeyCounts(const std::string &appName);
   std::vector<std::string> getAllApps();
 };

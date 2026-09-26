@@ -62,3 +62,20 @@ TEST_F(DatabaseTest, GetAllApps) {
     EXPECT_TRUE(std::find(apps.begin(), apps.end(), std::string("app1")) != apps.end()) << "app1 not found";
     EXPECT_TRUE(std::find(apps.begin(), apps.end(), std::string("app2")) != apps.end()) << "app2 not found";
 }
+// Пары (комбинация, число нажатий) для тепловой карты
+TEST_F(DatabaseTest, GetAppKeyCounts) {
+    db->updateKeyStatistics("app1", "Ctrl+S");
+    db->updateKeyStatistics("app1", "Ctrl+S");
+    db->updateKeyStatistics("app1", "Ctrl++");
+    db->updateKeyStatistics("app2", "A");
+
+    auto counts = db->getAppKeyCounts("app1");
+    ASSERT_EQ(counts.size(), 2u);
+    // По убыванию числа нажатий
+    EXPECT_EQ(counts[0].first, "Ctrl+S");
+    EXPECT_EQ(counts[0].second, 2);
+    EXPECT_EQ(counts[1].first, "Ctrl++");
+    EXPECT_EQ(counts[1].second, 1);
+
+    EXPECT_TRUE(db->getAppKeyCounts("no-such-app").empty());
+}
