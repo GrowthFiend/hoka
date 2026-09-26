@@ -43,13 +43,13 @@ ctest --preset gcc-preset                       # runs the hoka_tests target
 
 The core data flow is a producer/consumer pipeline:
 
-1. **KeyLogger** ([src/KeyLogger/KeyLogger.cpp](src/KeyLogger/KeyLogger.cpp)) installs a `WH_KEYBOARD_LL` global hook. The hook is a `static` function that reaches the object through a singleton `instance` pointer. On key-up it resolves the foreground process name via PSAPI, assembles a combination string (`Ctrl+`, `Shift+`, etc. + main key), and pushes a `KeyPressEvent` onto a mutex-guarded queue. Bare modifier presses are dropped.
-2. A dedicated **processing thread** drains that queue and invokes the event callback set in `main.cpp` (`handleKeyEvent`).
-3. `handleKeyEvent` writes the event to the **Database** and, if the window is visible, updates the FLTK UI and the tray tooltip.
+1. **KeyLogger** ([src/KeyLogger/KeyLogger.cpp](src/KeyLogger/KeyLogger.cpp)) installs a `WH_KEYBOARD_LL` global hook. The hook is a `static` function that reaches the object through a singleton `instance` pointer. On key-up it grabs the foreground window's PID, assembles a combination string (`Ctrl+`, `Shift+`, etc. + main key), and pushes a `RawKeyEvent` onto a mutex-guarded queue. Bare modifier presses are dropped. Keep the hook cheap: Windows silently removes a low-level hook that exceeds `LowLevelHooksTimeout`, which is why process-name resolution is *not* done here.
+2. A dedicated **processing thread** drains that queue, resolves the PID to a process name via PSAPI, and invokes the event callback set in `main.cpp` with a `KeyPressEvent`.
+3. That callback does no work itself: it marshals the event to the **main thread** with `Fl::awake(onKeyEventAwake, ...)`. There `handleKeyEvent` writes to the **Database** and, if the window is visible, updates the FLTK UI and the tray tooltip.
 
-Caveat worth knowing: `handleKeyEvent` runs on the KeyLogger's processing thread but touches FLTK widgets directly. FLTK is not thread-safe, so any new UI work triggered from key events lives in that same non-main-thread context.
+Threading rule: FLTK is not thread-safe, so all widget and DB access happens on the main thread. `main()` calls `Fl::lock()` once before anything else — on Win32 that is what records the main thread ID; without it `Fl::awake` posts to thread 0 and events are never delivered. Don't take `Fl::lock()` from the processing thread: `shutdown()` joins that thread from the main thread, which holds the FLTK lock, so it would deadlock.
 
-**Database** ([src/Database/Database.cpp](src/Database/Database.cpp)): thin SQLite wrapper. One table `key_statistics` with `UNIQUE(app_name, key_combination)`; `updateKeyStatistics` does an `INSERT OR REPLACE ... COALESCE(press_count + 1, 1)` to increment counts. All queries go through `executePreparedQuery`, which binds `std::variant<std::string,int>` params. The DB file `keypress_stats.db` is opened relative to the **current working directory**, not an absolute path.
+**Database** ([src/Database/Database.cpp](src/Database/Database.cpp)): thin SQLite wrapper. One table `key_statistics` with `UNIQUE(app_name, key_combination)`; `updateKeyStatistics` does an `INSERT OR REPLACE ... COALESCE(press_count + 1, 1)` to increment counts. All queries go through `executePreparedQuery`, which binds `std::variant<std::string,int>` params. `initialize()` takes the DB path, defaulting to `keypress_stats.db` relative to the **current working directory**, not an absolute path.
 
 **UI**: `MainWindow` ([src/UI/MainWindow.cpp](src/UI/MainWindow.cpp)) is an `Fl_Window` (recent-activity panel + per-app stats). `SystemTray` ([src/UI/SystemTray.cpp](src/UI/SystemTray.cpp)) provides minimize/close-to-tray. `main.cpp` runs a custom loop (`while(!shouldExit) Fl::wait(0.1)`) instead of `Fl::run()` so the app keeps running while all windows are hidden in the tray.
 
@@ -59,5 +59,6 @@ Caveat worth knowing: `handleKeyEvent` runs on the KeyLogger's processing thread
 
 - **Requires administrator rights.** The MSVC branch of `CMakeLists.txt` embeds a `requireAdministrator` manifest; the low-level keyboard hook generally needs elevation to observe elevated foreground apps. Run the app elevated.
 - **`hoka` is a GUI-subsystem (`WIN32`) executable**, so `std::cout`/`std::cerr` are invisible in a Release build. For MinGW the `Debug` build type switches `hoka` to the console subsystem, which is how you see the logging.
-- **Tests are not isolated from the app's data.** `hoka_tests` uses the same `keypress_stats.db` in the working directory and each test's `TearDown` calls `clearStatistics()` (wipes the whole table). `GetAllApps` asserts an exact row count, so it will fail if run concurrently or against a pre-populated DB.
+- **Tests use their own DB file**, `hoka_test.db` in the working directory, deleted in `SetUp`/`TearDown`, so they never touch `keypress_stats.db`. It is still a fixed filename, so don't run two `hoka_tests` processes in the same directory at once.
+- The `hoka` Release build's stdout can still be captured by launching it with redirected handles (e.g. `Start-Process -RedirectStandardOutput`); that is the easiest way to smoke-test it. Exit it cleanly by posting `WM_COMMAND` 1002 (`ID_EXIT`) to the hidden tray window (class `HokaTrayWindow`, title `Hoka Tray`).
 - Comments throughout the codebase are in Russian.
