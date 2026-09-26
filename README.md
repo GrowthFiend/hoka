@@ -39,28 +39,42 @@ As the project is in early development, the build process is primarily intended 
 
 *   **OS:** Windows 10 or 11
 *   **Git**
-*   **A C++17 Compiler:** (e.g., MinGW)
-*   **CMake:** Version 3.15+
+*   **MinGW-w64 GCC** — the build is MinGW-only (vcpkg triplet `x64-mingw-dynamic`); Visual Studio is not needed and not supported. The tested toolchain is [WinLibs](https://winlibs.com/) GCC 15.2.0, POSIX threads, UCRT, *without* LLVM (`winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-*.zip`). WinLibs already bundles **CMake** and **Ninja**, so no separate CMake install is required.
+
+### Setting up the toolchain
+
+1.  Unpack the WinLibs archive so that the compiler ends up at `C:\mingw64\bin\g++.exe` (the archive contains a top-level `mingw64` folder — extract it into `C:\`). This is the path `CMakePresets.json` expects; if you put MinGW elsewhere, change the paths in the preset.
+2.  Add `C:\mingw64\bin` to your user `PATH`. The presets add it for configure/build/test on their own, but running `hoka.exe` / `hoka_tests.exe` directly needs the MinGW runtime DLLs (`libstdc++-6.dll`, `libgcc_s_seh-1.dll`, `libwinpthread-1.dll`) from there.
+3.  Open a new terminal and check: `g++ --version` and `cmake --version`.
 
 ### Steps
 
 1.  **Clone the repository and its submodules:**
     ```bash
     git clone --recursive https://github.com/GrowthFiend/hoka.git
-    cd Hoka
+    cd hoka
     ```
+    If you cloned without `--recursive`, run `git submodule update --init --recursive`.
 
-2.  **Configure the project with CMake:**
-    This command will automatically handle all dependencies (like FLTK, Gtest and SQLite) via vcpkg.
+2.  **Configure the project:**
     ```bash
-    cmake -B build -S .
+    cmake --preset gcc-preset
     ```
+    On the first run vcpkg bootstraps itself and builds FLTK, SQLite, GTest and their dependencies from source. This takes a long time (anywhere from several minutes to half an hour, mostly downloads — some upstream mirrors are slow and vcpkg retries them). Later configures reuse vcpkg's binary cache and are fast.
 
-3.  **Build the project:**
+3.  **Build:**
     ```bash
-    cmake --build build --config Release
+    cmake --build --preset gcc-preset
     ```
-    The output executable will be generated in the `build/Release/` directory.
+    Executables are placed in `out/build/gcc-preset/`: `hoka.exe` (the app) and `hoka_tests.exe` (unit tests).
+
+4.  **Run the tests:**
+    ```bash
+    ctest --preset gcc-preset
+    ```
+    The tests use `keypress_stats.db` in their working directory (`out/build/gcc-preset/`) and clear it, so don't run them against a database you care about.
+
+5.  **Run the app:** `hoka.exe` installs a global keyboard hook and should be run **as administrator**. It creates `keypress_stats.db` in the current working directory.
 
 
 ## 🔮 Roadmap

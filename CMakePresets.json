@@ -7,11 +7,29 @@
             "description": "Using compilers: C = C:\\mingw64\\bin\\gcc.exe, CXX = C:\\mingw64\\bin\\g++.exe",
             "generator": "MinGW Makefiles",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "environment": {
+                "PATH": "C:/mingw64/bin;$penv{PATH}"
+            },
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
                 "CMAKE_C_COMPILER": "C:/mingw64/bin/gcc.exe",
                 "CMAKE_CXX_COMPILER": "C:/mingw64/bin/g++.exe",
                 "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "gcc-preset",
+            "configurePreset": "gcc-preset"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "gcc-preset",
+            "configurePreset": "gcc-preset",
+            "output": {
+                "outputOnFailure": true
             }
         }
     ]

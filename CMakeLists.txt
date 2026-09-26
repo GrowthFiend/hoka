@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.15)
 # ==============================================================================
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
 set(VCPKG_TARGET_TRIPLET "x64-mingw-dynamic" CACHE STRING "Vcpkg target triplet")
+set(VCPKG_HOST_TRIPLET "x64-mingw-dynamic" CACHE STRING "Vcpkg host triplet")
 
 # ==============================================================================
 # PROJECT SETUP
